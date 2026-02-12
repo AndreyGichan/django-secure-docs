@@ -89,5 +89,7 @@ class DocumentAccess(models.Model):
 
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
 
+    encrypted_dek = models.BinaryField(blank=True, null=True)
+
     class Meta:
         unique_together = ('document', 'user')

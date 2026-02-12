@@ -3,7 +3,7 @@ from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'owner', 'is_active', 'created_at', 'updated_at')
+    list_display = ('id', 'title', 'owner', 'is_active', 'created_at', 'updated_at')
     list_filter = ('is_active', 'created_at', 'updated_at')
     search_fields = ('title', 'owner__email', 'description')
 

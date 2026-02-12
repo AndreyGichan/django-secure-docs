@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 from django.contrib.auth import get_user_model
+from .utils.crypto import generate_dek, encrypt_file, encrypt_dek_for_user, decrypt_dek_for_user
+from django.core.files.base import ContentFile
 
 User = get_user_model()
 
@@ -33,16 +35,30 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         file = validated_data.pop('file')
         user = self.context['request'].user
 
-        document = Document.objects.create(
-            owner=user,
-            **validated_data
-        )
+        document = Document.objects.create(owner=user, **validated_data)
+        
+        dek = generate_dek()
+        file_bytes = file.read()
+        encrypted_bytes = encrypt_file(file_bytes, dek)
+        encrypted_file = ContentFile(encrypted_bytes, name=file.name)
 
         DocumentVersion.objects.create(
             document=document,
-            file=file,
+            file=encrypted_file,
             version_number=1,
             uploaded_by=user
+        )
+
+        encrypted_dek = encrypt_dek_for_user(
+            dek, 
+            user.public_key.encode()
+        )
+
+        DocumentAccess.objects.create(
+            document=document,
+            user=user,
+            role='editor',
+            encrypted_dek=encrypted_dek
         )
 
         return document
@@ -107,12 +123,25 @@ class ShareDocumentSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         document = self.context['document']
-        user = User.objects.get(id=validated_data['user_id'])
+        new_user  = User.objects.get(id=validated_data['user_id'])
+        owner = document.owner
+
+        owner_access = DocumentAccess.objects.get(document=document, user=owner)
+
+        if owner_access.encrypted_dek is None:
+            raise serializers.ValidationError("DEK для владельца отсутствует!")
+
+        dek = decrypt_dek_for_user(
+            owner_access.encrypted_dek,
+            owner.private_key.encode()
+        )
+
+        encrypted_dek = encrypt_dek_for_user(dek, new_user.public_key.encode()) # type: ignore
 
         access, created = DocumentAccess.objects.update_or_create(
             document=document,
-            user=user,
-            defaults={'role': validated_data['role']}
+            user=new_user,
+            defaults={'role': validated_data['role'], 'encrypted_dek': encrypted_dek}
         )
 
         return access

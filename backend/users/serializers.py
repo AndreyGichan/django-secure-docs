@@ -5,7 +5,8 @@ from dj_rest_auth.registration.serializers import RegisterSerializer
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "full_name"]
+        fields = ["id", "email", "full_name", "public_key"]
+        read_only_fields = ["public_key"]
 
 
 class CustomRegisterSerializer(RegisterSerializer):
@@ -26,7 +27,11 @@ class CustomRegisterSerializer(RegisterSerializer):
         }
 
     def save(self, request):
-        user = super().save(request)
-        user.full_name = self.validated_data.get('full_name') # type: ignore
-        user.save()
+        data = self.get_cleaned_data()
+        user = User.objects.create_user( # type: ignore
+        email=data['email'],
+        password=data['password1'],
+        full_name=data['full_name'],
+        role='employee'  
+        )
         return user
