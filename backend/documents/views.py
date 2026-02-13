@@ -22,6 +22,10 @@ from .serializers import (
 )
 from .permissions import IsOwnerOrHasAccess, CanEditDocument
 from .utils.crypto import encrypt_file, decrypt_dek_for_user, decrypt_file
+from audit.utils.audit import log_action
+from config.constants import AuditAction
+from audit.utils.request import get_client_ip  
+
 
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.filter(is_active=True)
@@ -86,6 +90,21 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 uploaded_by=user,
                 status='pending'  
             )
+
+            log_action(
+                user=user,
+                action=AuditAction.UPDATE,
+                target_type="DocumentVersion",
+                target_id=document.id,
+                old_data={
+                    "last_version": last_version.version_number if last_version else None
+                },
+                new_data={
+                    "new_version": new_version_number
+                },
+                ip_address=get_client_ip(request)
+            )
+
             return Response({"detail": "New version uploaded"}, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -96,8 +115,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
         version_id = request.data.get('version_id')
         version = get_object_or_404(DocumentVersion, id=version_id, document_id=pk)
 
+        old_status = version.status
         version.status = 'approved'
         version.save()
+
+        log_action(
+            user=request.user,
+            action=AuditAction.APPROVE,
+            target_type="DocumentVersion",
+            target_id=version.id,
+            old_data={"status": old_status},
+            new_data={"status": "approved"},
+            ip_address=get_client_ip(request)
+        )
 
         return Response({"detail": f"Version {version.version_number} approved"})
 
@@ -119,6 +149,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         if serializer.is_valid():
             serializer.save()
+
+            log_action(
+                user=request.user,
+                action=AuditAction.SHARE,
+                target_type="Document",
+                target_id=document.id,
+                extra_info={
+                    "shared_with": str(serializer.validated_data['user_id']),
+                    "role": serializer.validated_data['role']
+                },
+                ip_address=get_client_ip(request)
+            )
+
             return Response({"detail": "Access granted"}, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -137,6 +180,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
             created_by=request.user
         )
 
+        log_action(
+            user=request.user,
+            action=AuditAction.CREATE,
+            target_type="DownloadLink",
+            target_id=link.id,
+            old_data=None,
+            new_data={
+                "document_version_id": str(version.id),
+                "expires_at": str(link.expires_at)
+            },
+            ip_address=get_client_ip(request)
+        )
+
         serializer = DownloadLinkSerializer(link)
         return Response(serializer.data)
     
@@ -149,6 +205,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Link expired"}, status=status.HTTP_400_BAD_REQUEST)
 
         file = link.document_version.file
+
+        log_action(
+            user=request.user,
+            action=AuditAction.DOWNLOAD,
+            target_type="DocumentVersion",
+            target_id=link.document_version.id,
+            old_data=None,
+            new_data={
+                "link_token": str(token)
+            },
+            ip_address=get_client_ip(request)
+        )
+
         return FileResponse(file.open('rb'), as_attachment=True)
     
 

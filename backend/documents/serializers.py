@@ -1,8 +1,11 @@
 from rest_framework import serializers
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 from django.contrib.auth import get_user_model
-from .utils.crypto import generate_dek, encrypt_file, encrypt_dek_for_user, decrypt_dek_for_user
 from django.core.files.base import ContentFile
+from .utils.crypto import generate_dek, encrypt_file, encrypt_dek_for_user, decrypt_dek_for_user
+from audit.utils.audit import log_action
+from config.constants import AuditAction
+from audit.utils.request import get_client_ip
 
 User = get_user_model()
 
@@ -59,6 +62,19 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             user=user,
             role='editor',
             encrypted_dek=encrypted_dek
+        )
+
+        log_action(
+            user=user,
+            action=AuditAction.CREATE,
+            target_type="Document",
+            target_id=document.id,
+            old_data=None,
+            new_data={
+                "title": document.title,
+                "description": document.description
+            },
+            ip_address=get_client_ip(self.context['request'])
         )
 
         return document
@@ -143,6 +159,19 @@ class ShareDocumentSerializer(serializers.Serializer):
             document=document,
             user=new_user,
             defaults={'role': validated_data['role'], 'encrypted_dek': encrypted_dek}
+        )
+
+        log_action(
+            user=owner,
+            action=AuditAction.SHARE,
+            target_type="Document",
+            target_id=document.id,
+            old_data=None,
+            new_data={
+                "shared_with": str(new_user.id), # type: ignore
+                "role": validated_data['role']
+            },
+            ip_address=get_client_ip(self.context['request'])
         )
 
         return access
