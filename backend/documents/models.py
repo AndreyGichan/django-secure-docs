@@ -3,7 +3,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
-
+from config.constants import STATUS_CHOICES
 
 class Document(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -31,6 +31,7 @@ class DocumentVersion(models.Model):
 
     file = models.FileField(upload_to='documents/')
     version_number = models.PositiveIntegerField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='approved')
 
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

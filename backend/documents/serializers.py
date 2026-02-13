@@ -73,6 +73,7 @@ class DocumentVersionSerializer(serializers.ModelSerializer):
             'id',
             'version_number',
             'file',
+            'status',
             'uploaded_by',
             'uploaded_by_email',
             'uploaded_at'

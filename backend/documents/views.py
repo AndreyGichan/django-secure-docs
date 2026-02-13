@@ -8,6 +8,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db import models
 from django.http import FileResponse
+from django.core.files.base import ContentFile
 from io import BytesIO
 
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
@@ -20,7 +21,7 @@ from .serializers import (
     DownloadLinkSerializer
 )
 from .permissions import IsOwnerOrHasAccess, CanEditDocument
-from .utils.crypto import decrypt_dek_for_user, decrypt_file
+from .utils.crypto import encrypt_file, decrypt_dek_for_user, decrypt_file
 
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.filter(is_active=True)
@@ -58,6 +59,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, CanEditDocument])
     def upload_version(self, request, pk=None):
         document = self.get_object()
+        user = request.user
 
         serializer = DocumentVersionCreateSerializer(
             data=request.data,
@@ -65,11 +67,40 @@ class DocumentViewSet(viewsets.ModelViewSet):
         )
 
         if serializer.is_valid():
-            serializer.save()
+            file = serializer.validated_data['file']
+
+            access = DocumentAccess.objects.get(document=document, user=user)
+            dek = decrypt_dek_for_user(access.encrypted_dek, user.private_key.encode())
+
+            file_bytes = file.read()
+            encrypted_bytes = encrypt_file(file_bytes, dek)
+            encrypted_file = ContentFile(encrypted_bytes, name=file.name + '.enc')
+
+            last_version = document.versions.first()
+            new_version_number = last_version.version_number + 1 if last_version else 1
+
+            DocumentVersion.objects.create(
+                document=document,
+                file=encrypted_file,
+                version_number=new_version_number,
+                uploaded_by=user,
+                status='pending'  
+            )
             return Response({"detail": "New version uploaded"}, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsOwnerOrHasAccess])
+    def approve_version(self, request, pk=None):
+        version_id = request.data.get('version_id')
+        version = get_object_or_404(DocumentVersion, id=version_id, document_id=pk)
+
+        version.status = 'approved'
+        version.save()
+
+        return Response({"detail": f"Version {version.version_number} approved"})
+
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def share(self, request, pk=None):
@@ -163,9 +194,3 @@ class DocumentViewSet(viewsets.ModelViewSet):
             filename=version.file.name.replace('.enc', '')
         )
         return response
-
-
-
-
-
-

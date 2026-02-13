@@ -3,3 +3,9 @@ ROLE_CHOICES = (
     ("employee", "Employee"),
     ("external", "External"),
 )
+
+
+STATUS_CHOICES = [
+        ('pending', 'Pending approval'),  
+        ('approved', 'Approved'),         
+    ]
