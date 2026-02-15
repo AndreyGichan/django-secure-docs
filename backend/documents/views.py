@@ -155,7 +155,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 action=AuditAction.SHARE,
                 target_type="Document",
                 target_id=document.id,
-                extra_info={
+                old_data=None,
+                new_data={
                     "shared_with": str(serializer.validated_data['user_id']),
                     "role": serializer.validated_data['role']
                 },

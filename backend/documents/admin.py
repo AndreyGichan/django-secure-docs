@@ -10,7 +10,7 @@ class DocumentAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentVersion)
 class DocumentVersionAdmin(admin.ModelAdmin):
-    list_display = ('document', 'version_number', 'uploaded_by', 'uploaded_at')
+    list_display = ('id', 'document', 'version_number', 'uploaded_by', 'uploaded_at')
     list_filter = ('uploaded_at',)
     search_fields = ('document__title', 'uploaded_by__email')
 

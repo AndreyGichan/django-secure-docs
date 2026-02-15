@@ -3,8 +3,9 @@ from rest_framework.permissions import IsAdminUser
 
 from .models import AuditLog
 from .serializers import AuditLogSerializer
+from .permissions import IsAuditAdmin
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.all()
     serializer_class = AuditLogSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuditAdmin]
