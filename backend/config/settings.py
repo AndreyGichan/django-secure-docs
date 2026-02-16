@@ -32,17 +32,11 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-# AUTH_USER_MODEL = 'users.User'
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000", 
+]
 
-# ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-# ACCOUNT_USERNAME_REQUIRED = False
-# ACCOUNT_EMAIL_REQUIRED = True
-# # ACCOUNT_AUTHENTICATION_METHOD = 'email'
-# # ACCOUNT_EMAIL_VERIFICATION = "none"
-
-# ACCOUNT_LOGIN_METHODS = {'email'}
-# ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
-# ACCOUNT_EMAIL_VERIFICATION = "none"
+CORS_ALLOW_CREDENTIALS = True
 
 AUTH_USER_MODEL = 'users.User'
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
@@ -54,11 +48,16 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKEN": False,
+    "ROTATE_REFRESH_TOKEN": True,
     "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": True,
     "SIGNING_KEY": "acomplexkey",
-    "ALGORIGTHM": "HS512",
+    "ALGORITHM": "HS512",
+    "AUTH_COOKIE": "access_token",        
+    "AUTH_COOKIE_SECURE": False,          
+    "AUTH_COOKIE_HTTP_ONLY": True,
+    "AUTH_COOKIE_PATH": "/",              
+    "AUTH_COOKIE_SAMESITE": "Lax",        
 }
 
 REST_FRAMEWORK = {
@@ -72,8 +71,11 @@ REST_FRAMEWORK = {
 
 REST_AUTH = {
     'USE_JWT': True,
-    'JWT_AUTH_HTTPONLY': False
+    'JWT_AUTH_HTTPONLY': True,
+    'JWT_AUTH_COOKIE': 'access_token', 
 }
+
+REST_USE_JWT = True
 
 REST_AUTH_REGISTER_SERIALIZERS = {
     'REGISTER_SERIALIZER': 'users.serializers.CustomRegisterSerializer',
@@ -101,6 +103,8 @@ INSTALLED_APPS = [
     'users',
     'documents',
     'audit',
+    'reports',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
@@ -111,7 +115,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'allauth.account.middleware.AccountMiddleware'
+    'allauth.account.middleware.AccountMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

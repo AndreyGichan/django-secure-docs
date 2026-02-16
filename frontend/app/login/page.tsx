@@ -8,18 +8,30 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { API } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => {
-      router.push("/dashboard")
-    }, 800)
+    setError("");
+
+    try {
+      const res = await API.post("login/", { email, password });
+      console.log("Успешно вошли:", res.data);
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Ошибка входа");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -40,7 +52,7 @@ export default function LoginPage() {
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
       </div>
 
-      <div className="relative z-10 w-full max-w-sm px-6">
+      <div className="relative z-10 w-full max-w-md px-6">
         {/* Logo */}
         <div className="mb-10 flex flex-col items-center gap-4">
           <div className="relative">
@@ -64,34 +76,37 @@ export default function LoginPage() {
 
             <div className="relative">
               <div className="mb-6">
-                <h2 className="text-base font-semibold text-foreground">Sign In</h2>
-                <p className="mt-1 text-xs text-muted-foreground">Enter your credentials to access the system</p>
+                <h2 className="text-base font-semibold tracking-wide text-foreground">Sign In</h2>
+                <p className="mt-1 text-xs tracking-wide text-muted-foreground">Введите учетные данные для доступа к системе</p>
               </div>
+
 
               <div className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">
                   <Label className="text-xs text-muted-foreground font-medium">Email</Label>
                   <Input
                     type="email"
-                    placeholder="admin@company.com"
-                    className="h-10 bg-secondary/50 border-border/70 text-foreground placeholder:text-muted-foreground/40 text-sm focus-visible:ring-violet-500/50 focus-visible:border-violet-500/30"
-                    defaultValue="admin@company.com"
+                    placeholder="user@company.com"
+                    className="h-10 bg-secondary/50 border-border/70 tracking-wide text-foreground placeholder:text-muted-foreground/40 text-sm focus-visible:ring-violet-500/50 focus-visible:border-violet-500/30"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground font-medium">Password</Label>
-                    <button type="button" className="text-[11px] text-violet-400 hover:text-violet-300 transition-colors">
-                      Forgot password?
+                    <Label className="text-xs text-muted-foreground font-medium">Пароль</Label>
+                    <button type="button" className="text-[11px] tracking-wide text-violet-400 hover:text-violet-300 transition-colors">
+                      Забыли пароль?
                     </button>
                   </div>
                   <div className="relative">
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter password"
-                      className="h-10 bg-secondary/50 border-border/70 text-foreground placeholder:text-muted-foreground/40 text-sm pr-10 focus-visible:ring-violet-500/50 focus-visible:border-violet-500/30"
-                      defaultValue="password"
+                      placeholder="Введите пароль"
+                      className="h-10 bg-secondary/50 border-border/70 tracking-wide text-foreground placeholder:text-muted-foreground/40 text-sm pr-10 focus-visible:ring-violet-500/50 focus-visible:border-violet-500/30"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                     />
                     <button
                       type="button"
@@ -105,12 +120,13 @@ export default function LoginPage() {
 
                 <div className="flex items-center gap-2">
                   <Checkbox id="remember" className="border-border data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500" />
-                  <label htmlFor="remember" className="text-xs text-muted-foreground cursor-pointer">
-                    Remember me
+                  <label htmlFor="remember" className="text-xs text-muted-foreground tracking-wide cursor-pointer">
+                    Запомнить меня
                   </label>
                 </div>
               </div>
 
+              {error && <p className="text-red-500">{error}</p>}
               <Button
                 type="submit"
                 disabled={loading}
@@ -128,6 +144,18 @@ export default function LoginPage() {
                   </div>
                 )}
               </Button>
+
+              <div className="mt-6 text-center text-xs text-muted-foreground">
+                Нет учетной записи?{" "}
+                <button
+                  type="button"
+                  onClick={() => router.push("/register")}
+                  className="text-violet-400 hover:text-violet-300 transition-colors tracking-wide"
+                >
+                  Создать учетную запись
+                </button>
+              </div>
+
             </div>
           </div>
         </form>
