@@ -12,6 +12,8 @@ User = get_user_model()
 
 class DocumentSerializer(serializers.ModelSerializer):
     owner_email = serializers.EmailField(source='owner.email', read_only=True)
+    shared_with = serializers.SerializerMethodField() 
+    version = serializers.SerializerMethodField()     
 
     class Meta:
         model = Document
@@ -21,10 +23,22 @@ class DocumentSerializer(serializers.ModelSerializer):
             'description',
             'owner',
             'owner_email',
+            'status',
+            'type',
+            'size',
+            'shared_with',
+            'version',
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['owner']
+        read_only_fields = ['owner', 'type', 'size', 'shared_with', 'version']
+
+    def get_version(self, obj):
+        latest = obj.versions.first()
+        return latest.version_number if latest else None
+    
+    def get_shared_with(self, obj):
+        return obj.access_list.exclude(user=obj.owner).count()
 
 
 class DocumentCreateSerializer(serializers.ModelSerializer):
@@ -37,8 +51,14 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         file = validated_data.pop('file')
         user = self.context['request'].user
+        file_name = file.name
+        file_size = file.size
 
         document = Document.objects.create(owner=user, **validated_data)
+
+        document.type = file_name.split('.')[-1].lower()
+        document.size = f"{round(file_size / 1024 / 1024, 2)} MB"
+        document.save()
         
         dek = generate_dek()
         file_bytes = file.read()

@@ -3,13 +3,17 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
-from config.constants import STATUS_CHOICES
+from config.constants import STATUS_CHOICES, DOCUMENT_STATUS_CHOICES
 
 class Document(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='documents')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=DOCUMENT_STATUS_CHOICES, default='draft')
+    type = models.CharField(max_length=10, blank=True, null=True)  
+    size = models.CharField(max_length=20, blank=True, null=True)  
+    shared_with = models.PositiveIntegerField(default=0)
 
     is_active = models.BooleanField(default=True)
 

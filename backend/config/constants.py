@@ -15,8 +15,8 @@ class AuditAction(models.TextChoices):
 
 ROLE_CHOICES = (
     ("admin", "Admin"),
+    ("manager", "Manager"),
     ("employee", "Employee"),
-    ("external", "External"),
 )
 
 
@@ -25,3 +25,9 @@ STATUS_CHOICES = [
     ('approved', 'Approved'),         
 ]
 
+
+DOCUMENT_STATUS_CHOICES = [
+    ('draft', 'Draft'),
+    ('active', 'Active'),
+    ('archived', 'Archived'),
+]

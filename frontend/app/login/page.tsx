@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { API } from "@/lib/api";
+import { login } from "@/lib/api/auth";
 
 export default function LoginPage() {
   const router = useRouter()
@@ -24,7 +24,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const res = await API.post("login/", { email, password });
+      const res = await login({ email, password });
       console.log("Успешно вошли:", res.data);
       router.push("/dashboard");
     } catch (err: any) {
@@ -126,7 +126,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {error && <p className="text-red-500">{error}</p>}
+              {error && <p className="text-red-500 text-center mt-2">{error}</p>}
               <Button
                 type="submit"
                 disabled={loading}

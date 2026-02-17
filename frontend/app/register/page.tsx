@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { API } from "@/lib/api";
+import { register, login as loginUser } from "@/lib/api/auth";
 
 export default function RegisterPage() {
     const router = useRouter()
@@ -35,17 +35,14 @@ export default function RegisterPage() {
         }
 
         try {
-            await API.post("register/", {
+            await register({
                 email,
                 password1: password,
                 password2: confirmPassword,
                 full_name: fullName,
             });
 
-            await API.post("login/", {
-                email,
-                password,
-            });
+            await loginUser({ email, password });
 
             router.push("/dashboard");
         } catch (err: any) {

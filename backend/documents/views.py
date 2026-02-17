@@ -91,6 +91,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 status='pending'  
             )
 
+            document.status = 'draft'
+            document.save()
+
+
             log_action(
                 user=user,
                 action=AuditAction.UPDATE,
@@ -118,6 +122,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
         old_status = version.status
         version.status = 'approved'
         version.save()
+        version.document.status = 'active'
+        version.document.save()
 
         log_action(
             user=request.user,
@@ -264,3 +270,12 @@ class DocumentViewSet(viewsets.ModelViewSet):
             filename=version.file.name.replace('.enc', '')
         )
         return response
+    
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsOwnerOrHasAccess])
+    def archive(self, request, pk=None):
+        document = self.get_object()
+        document.status = 'archived'
+        document.save()
+
+        return Response({"detail": "Document archived"})

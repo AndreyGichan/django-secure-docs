@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   FileText,
   Upload,
@@ -59,31 +59,46 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { getDocuments } from "@/lib/api/documents";
 
 interface Document {
   id: string
   title: string
+  description: string
   type: string
   size: string
+  owner_email: string
   version: number
-  owner: string
   sharedWith: number
-  lastModified: string
   status: "active" | "archived" | "draft"
+  created_at: string
+  updated_at: string
 }
 
-const documents: Document[] = [
-  { id: "1", title: "Q4_Financial_Report_2025.pdf", type: "pdf", size: "2.4 MB", version: 5, owner: "Ivanov I.", sharedWith: 8, lastModified: "2 hours ago", status: "active" },
-  { id: "2", title: "Budget_Forecast_2026.xlsx", type: "xlsx", size: "1.1 MB", version: 3, owner: "Petrova A.", sharedWith: 5, lastModified: "5 hours ago", status: "active" },
-  { id: "3", title: "NDA_Template_v2.docx", type: "docx", size: "340 KB", version: 2, owner: "Sidorov K.", sharedWith: 12, lastModified: "1 day ago", status: "active" },
-  { id: "4", title: "Product_Roadmap.pdf", type: "pdf", size: "5.7 MB", version: 8, owner: "Kozlova M.", sharedWith: 15, lastModified: "1 day ago", status: "active" },
-  { id: "5", title: "Meeting_Notes_Jan.docx", type: "docx", size: "89 KB", version: 1, owner: "Novikov D.", sharedWith: 3, lastModified: "2 days ago", status: "draft" },
-  { id: "6", title: "Architecture_Diagram.png", type: "png", size: "3.2 MB", version: 4, owner: "Ivanov I.", sharedWith: 10, lastModified: "3 days ago", status: "active" },
-  { id: "7", title: "Security_Audit_2025.pdf", type: "pdf", size: "1.8 MB", version: 2, owner: "Petrova A.", sharedWith: 2, lastModified: "5 days ago", status: "archived" },
-  { id: "8", title: "Employee_Handbook.pdf", type: "pdf", size: "4.5 MB", version: 12, owner: "Sidorov K.", sharedWith: 45, lastModified: "1 week ago", status: "active" },
-  { id: "9", title: "API_Documentation.docx", type: "docx", size: "678 KB", version: 6, owner: "Kozlova M.", sharedWith: 8, lastModified: "1 week ago", status: "active" },
-  { id: "10", title: "Invoice_Dec_2025.xlsx", type: "xlsx", size: "245 KB", version: 1, owner: "Novikov D.", sharedWith: 1, lastModified: "2 weeks ago", status: "archived" },
-]
+// interface Document {
+//   id: string
+//   title: string
+//   type: string
+//   size: string
+//   version: number
+//   owner: string
+//   sharedWith: number
+//   lastModified: string
+//   status: "active" | "archived" | "draft"
+// }
+
+// const documents: Document[] = [
+//   { id: "1", title: "Q4_Financial_Report_2025.pdf", type: "pdf", size: "2.4 MB", version: 5, owner: "Ivanov I.", sharedWith: 8, lastModified: "2 hours ago", status: "active" },
+//   { id: "2", title: "Budget_Forecast_2026.xlsx", type: "xlsx", size: "1.1 MB", version: 3, owner: "Petrova A.", sharedWith: 5, lastModified: "5 hours ago", status: "active" },
+//   { id: "3", title: "NDA_Template_v2.docx", type: "docx", size: "340 KB", version: 2, owner: "Sidorov K.", sharedWith: 12, lastModified: "1 day ago", status: "active" },
+//   { id: "4", title: "Product_Roadmap.pdf", type: "pdf", size: "5.7 MB", version: 8, owner: "Kozlova M.", sharedWith: 15, lastModified: "1 day ago", status: "active" },
+//   { id: "5", title: "Meeting_Notes_Jan.docx", type: "docx", size: "89 KB", version: 1, owner: "Novikov D.", sharedWith: 3, lastModified: "2 days ago", status: "draft" },
+//   { id: "6", title: "Architecture_Diagram.png", type: "png", size: "3.2 MB", version: 4, owner: "Ivanov I.", sharedWith: 10, lastModified: "3 days ago", status: "active" },
+//   { id: "7", title: "Security_Audit_2025.pdf", type: "pdf", size: "1.8 MB", version: 2, owner: "Petrova A.", sharedWith: 2, lastModified: "5 days ago", status: "archived" },
+//   { id: "8", title: "Employee_Handbook.pdf", type: "pdf", size: "4.5 MB", version: 12, owner: "Sidorov K.", sharedWith: 45, lastModified: "1 week ago", status: "active" },
+//   { id: "9", title: "API_Documentation.docx", type: "docx", size: "678 KB", version: 6, owner: "Kozlova M.", sharedWith: 8, lastModified: "1 week ago", status: "active" },
+//   { id: "10", title: "Invoice_Dec_2025.xlsx", type: "xlsx", size: "245 KB", version: 1, owner: "Novikov D.", sharedWith: 1, lastModified: "2 weeks ago", status: "archived" },
+// ]
 
 function getFileIcon(type: string) {
   switch (type) {
@@ -148,10 +163,28 @@ export default function DocumentsPage() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchDocuments() {
+      try {
+        const response = await getDocuments()
+        setDocuments(response.data)
+      } catch (error) {
+        console.error("Failed to fetch documents", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchDocuments()
+  }, [])
 
   const filtered = documents.filter((doc) =>
     doc.title.toLowerCase().includes(search.toLowerCase())
   )
+
+  if (loading) return <div className="p-6 text-xs text-muted-foreground">Loading documents...</div>
 
   return (
     <div className="flex flex-1 flex-col">
@@ -291,7 +324,7 @@ export default function DocumentsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {doc.owner}
+                    {doc.owner_email}
                   </TableCell>
                   <TableCell className="text-center">
                     <span className="font-mono text-xs text-muted-foreground">
@@ -307,7 +340,7 @@ export default function DocumentsPage() {
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      <span className="text-[10px]">{doc.lastModified}</span>
+                      <span className="text-[10px]">{doc.updated_at}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -392,7 +425,7 @@ export default function DocumentsPage() {
               <div className="flex flex-col gap-3 py-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Owner</span>
-                  <span className="text-foreground font-medium">{selectedDoc.owner}</span>
+                  <span className="text-foreground font-medium">{selectedDoc.owner_email}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Status</span>
@@ -404,7 +437,7 @@ export default function DocumentsPage() {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Last Modified</span>
-                  <span className="text-foreground">{selectedDoc.lastModified}</span>
+                  <span className="text-foreground">{selectedDoc.updated_at}</span>
                 </div>
                 <Separator className="bg-border/50" />
                 <div>
