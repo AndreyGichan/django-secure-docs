@@ -12,8 +12,12 @@ User = get_user_model()
 
 class DocumentSerializer(serializers.ModelSerializer):
     owner_email = serializers.EmailField(source='owner.email', read_only=True)
-    shared_with = serializers.SerializerMethodField() 
-    version = serializers.SerializerMethodField()     
+    owner_full_name = serializers.CharField(source='owner.full_name', read_only=True)
+    # shared_with = serializers.IntegerField(source='shared_with_count', read_only=True)  
+    # version = serializers.IntegerField(source='version_number', read_only=True)  
+
+    shared_with = serializers.SerializerMethodField()
+    version = serializers.SerializerMethodField()       
 
     class Meta:
         model = Document
@@ -23,6 +27,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'description',
             'owner',
             'owner_email',
+            'owner_full_name',
             'status',
             'type',
             'size',
@@ -33,12 +38,12 @@ class DocumentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['owner', 'type', 'size', 'shared_with', 'version']
 
-    def get_version(self, obj):
-        latest = obj.versions.first()
-        return latest.version_number if latest else None
-    
     def get_shared_with(self, obj):
         return obj.access_list.exclude(user=obj.owner).count()
+
+    def get_version(self, obj):
+        latest_version = obj.versions.order_by("-version_number").first()
+        return latest_version.version_number if latest_version else None
 
 
 class DocumentCreateSerializer(serializers.ModelSerializer):
@@ -57,13 +62,18 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         document = Document.objects.create(owner=user, **validated_data)
 
         document.type = file_name.split('.')[-1].lower()
-        document.size = f"{round(file_size / 1024 / 1024, 2)} MB"
+        if file_size >= 1024 * 1024:
+            document.size = f"{round(file_size / 1024 / 1024, 2)} MB"
+        elif file_size >= 1024:
+            document.size = f"{round(file_size / 1024, 2)} KB"
+        else:
+            document.size = f"{file_size} B"
         document.save()
         
         dek = generate_dek()
         file_bytes = file.read()
         encrypted_bytes = encrypt_file(file_bytes, dek)
-        encrypted_file = ContentFile(encrypted_bytes, name=file.name)
+        encrypted_file = ContentFile(encrypted_bytes, name=file.name + ".enc")
 
         DocumentVersion.objects.create(
             document=document,

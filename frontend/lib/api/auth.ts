@@ -13,7 +13,6 @@ interface RegisterData {
 }
 
 export const login = (data: LoginData) => API.post("users/login/", data);
-
 export const register = (data: RegisterData) => API.post("users/register/", data);
-
 export const logout = () => API.post("users/logout/");
+export const getCurrentUser = () => API.get("users/profile/");

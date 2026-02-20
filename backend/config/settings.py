@@ -106,6 +106,7 @@ INSTALLED_APPS = [
     'audit',
     'reports',
     'corsheaders',
+    'django_filters',
 ]
 
 MIDDLEWARE = [

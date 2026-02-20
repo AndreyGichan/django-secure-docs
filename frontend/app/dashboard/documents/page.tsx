@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   FileText,
   Upload,
@@ -14,12 +14,15 @@ import {
   Filter,
   Plus,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   X,
   File,
   FileSpreadsheet,
   FileImage,
   ChevronLeft,
   ChevronRight,
+  Pencil,
 } from "lucide-react"
 
 import { PageHeader } from "@/components/page-header"
@@ -58,8 +61,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { getDocuments } from "@/lib/api/documents";
+import { getCurrentUser } from "@/lib/api/auth"
+import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument } from "@/lib/api/documents"
 
 interface Document {
   id: string
@@ -68,8 +74,9 @@ interface Document {
   type: string
   size: string
   owner_email: string
+  owner_full_name: string
   version: number
-  sharedWith: number
+  shared_with: number
   status: "active" | "archived" | "draft"
   created_at: string
   updated_at: string
@@ -108,6 +115,13 @@ function getFileIcon(type: string) {
           <File className="h-4 w-4 text-rose-400" />
         </div>
       )
+    case "doc":
+    case "docx":
+      return (
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 border border-blue-500/10">
+          <FileText className="h-4 w-4 text-blue-400" />
+        </div>
+      )
     case "xlsx":
       return (
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 border border-emerald-500/10">
@@ -130,27 +144,42 @@ function getFileIcon(type: string) {
   }
 }
 
-function getStatusBadge(status: string) {
+function getStatusBadge(status: string, isSelected = false, compact = false) {
+  const baseClasses = `text-[10px] font-mono rounded-xl ${compact ? "inline-flex items-center gap-1" : "flex items-center gap-1.5"
+    }`
+
   switch (status) {
     case "active":
       return (
-        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] font-mono">
-          <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          Active
+        <Badge
+          variant="outline"
+          className={`${baseClasses} bg-emerald-500/15 text-emerald-400 tracking-wide border-emerald-500/30 ${isSelected ? "ring-2 ring-emerald-400" : ""
+            }`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          Активен
         </Badge>
       )
     case "archived":
       return (
-        <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono">
-          <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
-          Archived
+        <Badge
+          variant="outline"
+          className={`${baseClasses} bg-amber-500/15 text-amber-400 tracking-wide border-amber-500/30 ${isSelected ? "ring-2 ring-amber-400" : ""
+            }`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+          В архиве
         </Badge>
       )
     case "draft":
       return (
-        <Badge variant="outline" className="bg-sky-500/15 text-sky-400 border-sky-500/30 text-[10px] font-mono">
-          <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-sky-400" />
-          Draft
+        <Badge
+          variant="outline"
+          className={`${baseClasses} bg-sky-500/15 text-sky-400 tracking-wide border-sky-500/30 ${isSelected ? "ring-2 ring-sky-400" : ""
+            }`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+          Черновик
         </Badge>
       )
     default:
@@ -158,33 +187,311 @@ function getStatusBadge(status: string) {
   }
 }
 
+function formatOwnerName(fullName: string) {
+  if (!fullName) return ""
+
+  const parts = fullName.trim().split(/\s+/)
+
+  if (parts.length === 1) return parts[0]
+
+  const lastName = parts[0]
+  const initials = parts
+    .slice(1)
+    .map((name) => name.charAt(0).toUpperCase() + ".")
+    .join("")
+
+  return `${lastName} ${initials}`
+}
+
+function formatRelativeDate(dateString: string) {
+  const date = new Date(dateString)
+  const now = new Date()
+
+  const diffMs = now.getTime() - date.getTime()
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffMinutes < 1) return "только что"
+  if (diffMinutes < 60) return `${diffMinutes} мин назад`
+  if (diffHours < 24) return `${diffHours} ч назад`
+  if (diffDays < 7) return `${diffDays} дн назад`
+
+  return date.toLocaleDateString("ru-RU")
+}
+
 export default function DocumentsPage() {
-  const [search, setSearch] = useState("")
   const [uploadOpen, setUploadOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [descriptionEdit, setDescriptionEdit] = useState("")
+  const [editingDocId, setEditingDocId] = useState<string | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const [filterStatus, setFilterStatus] = useState<Document["status"] | "all">("all")
+  const [sortField, setSortField] = useState<keyof Document | null>(null)
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [filterOwner, setFilterOwner] = useState<string | "all">("all")
+  const [searchInput, setSearchInput] = useState("")
+  const [search, setSearch] = useState("")
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadTitle, setUploadTitle] = useState("")
+  const [uploadDescription, setUploadDescription] = useState("")
+  const [uploadType, setUploadType] = useState("")
+  const [uploadLoading, setUploadLoading] = useState(false)
+  const [uploadVersionOpen, setUploadVersionOpen] = useState(false);
+  const [uploadFileVersion, setUploadFileVersion] = useState<File | null>(null);
+  const [uploadLoadingVersion, setUploadLoadingVersion] = useState(false);
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+  const [totalCount, setTotalCount] = useState(0)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<Document | null>(null);
+
+  const hiddenFileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    async function fetchDocuments() {
+    async function fetchCurrentUser() {
       try {
-        const response = await getDocuments()
-        setDocuments(response.data)
+        const res = await getCurrentUser()
+        setCurrentUser(res.data)
       } catch (error) {
-        console.error("Failed to fetch documents", error)
-      } finally {
-        setLoading(false)
+        console.error("Failed to fetch current user", error)
       }
     }
-    fetchDocuments()
+    fetchCurrentUser()
   }, [])
 
-  const filtered = documents.filter((doc) =>
-    doc.title.toLowerCase().includes(search.toLowerCase())
-  )
+  useEffect(() => {
+    if (selectedDoc) {
+      setDescriptionEdit(selectedDoc.description || "")
+    }
+    setEditingDocId(null)
+  }, [selectedDoc])
 
-  if (loading) return <div className="p-6 text-xs text-muted-foreground">Loading documents...</div>
+  useEffect(() => {
+    if (searchInput.trim() === "") {
+      setSearch("");
+      setPage(1);
+      return;
+    }
+
+    if (searchInput.length < 3) return;
+
+    const handler = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 800);
+
+    return () => clearTimeout(handler);
+  }, [searchInput]);
+
+  async function fetchDocuments() {
+    if (!currentUser) return;
+    setLoading(true);
+
+    const params: any = {
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      search: search || undefined,
+      status: filterStatus !== "all" ? filterStatus : undefined,
+      owner:
+        filterOwner === "mine"
+          ? "mine"
+          : filterOwner === "others"
+            ? "others"
+            : undefined,
+      ordering: sortField
+        ? sortDirection === "asc"
+          ? sortField === "owner_full_name"
+            ? "owner__full_name"
+            : sortField === "version"
+              ? "version_number"
+              : sortField === "shared_with"
+                ? "shared_with_count"
+                : sortField
+          : sortField === "owner_full_name"
+            ? "-owner__full_name"
+            : sortField === "version"
+              ? "-version_number"
+              : sortField === "shared_with"
+                ? "-shared_with_count"
+                : `-${sortField}`
+        : undefined
+    };
+
+    try {
+      const response = await getDocuments(params);
+      setDocuments(response.data.results);
+      setTotalCount(response.data.count);
+    } catch (error) {
+      console.error("Failed to fetch documents", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [search, filterStatus, filterOwner, sortField, sortDirection, currentUser, page]);
+
+  const filtered = documents;
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  useEffect(() => {
+    if (editingDocId && textareaRef.current) {
+      const ta = textareaRef.current
+      ta.style.height = "0px"
+      ta.style.height = ta.scrollHeight + "px"
+    }
+  }, [editingDocId, descriptionEdit])
+
+  const handleStatusChange = async (status: Document["status"]) => {
+    if (!selectedDoc) return;
+
+    const oldStatus = selectedDoc.status;
+
+    setSelectedDoc((doc) => (doc ? { ...doc, status } : null));
+    setDocuments((docs) =>
+      docs.map((doc) =>
+        doc.id === selectedDoc.id ? { ...doc, status } : doc
+      )
+    );
+
+    try {
+      await updateDocument(selectedDoc.id, { status });
+    } catch (error) {
+      console.error("Failed to update document status", error);
+      setSelectedDoc((doc) => (doc ? { ...doc, status: oldStatus } : null));
+      setDocuments((docs) =>
+        docs.map((doc) =>
+          doc.id === selectedDoc.id ? { ...doc, status: oldStatus } : doc
+        )
+      );
+    }
+  };
+
+  const handleSort = (field: keyof Document) => {
+    if (sortField === field) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortField(null);
+        setSortDirection("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile || !uploadTitle) {
+      alert("Заполните все поля")
+      return
+    }
+
+    try {
+      setUploadLoading(true)
+
+      const formData = new FormData()
+      formData.append("file", uploadFile)
+      formData.append("title", uploadTitle)
+      formData.append("description", uploadDescription)
+      formData.append("type", uploadType)
+
+      await createDocument(formData)
+
+      setUploadOpen(false)
+
+      setUploadFile(null)
+      setUploadTitle("")
+      setUploadDescription("")
+      setUploadType("")
+
+      await fetchDocuments()
+
+    } catch (error) {
+      console.error("Upload error", error)
+    } finally {
+      setUploadLoading(false)
+    }
+  }
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadFile(file)
+    const extension = file.name.split(".").pop()?.toLowerCase() || ""
+    setUploadType(extension)
+  }
+
+  const resetUploadForm = () => {
+    setUploadFile(null)
+    setUploadTitle("")
+    setUploadDescription("")
+    setUploadType("")
+  }
+
+  const handleFileSelectVersion = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadFileVersion(file);
+  };
+
+  const handleUploadVersion = async () => {
+    if (!uploadFileVersion || !selectedDoc) return;
+
+    try {
+      setUploadLoadingVersion(true);
+
+      const formData = new FormData();
+      formData.append("file", uploadFileVersion);
+
+      await uploadDocumentVersion(selectedDoc.id, formData);
+
+      setUploadVersionOpen(false);
+      setUploadFileVersion(null);
+
+      await fetchDocuments();
+    } catch (error) {
+      console.error("Failed to upload new version", error);
+    } finally {
+      setUploadLoadingVersion(false);
+    }
+  };
+
+  const getDaysWord = (days: number) => {
+    if (days % 10 === 1 && days % 100 !== 11) return "день";
+    if ([2, 3, 4].includes(days % 10) && ![12, 13, 14].includes(days % 100))
+      return "дня";
+    return "дней";
+  };
+
+  const handleDelete = async () => {
+    if (!docToDelete) return;
+    try {
+      await deleteDocument(docToDelete.id);
+      setDocuments((docs) => docs.filter((d) => d.id !== docToDelete.id));
+      setDeleteDialogOpen(false);
+      setDocToDelete(null);
+
+      if (documents.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchDocuments();
+      }
+
+      setTotalCount((count) => count - 1);
+    } catch (error) {
+      console.error("Failed to delete document", error);
+    }
+  };
+
+
+  // if (loading) return <div className="p-6 text-xs text-muted-foreground tracking-wide">Загрузка документов...</div>
 
   return (
     <div className="flex flex-1 flex-col">
@@ -194,63 +501,6 @@ export default function DocumentsPage() {
           { label: "Documents" },
         ]}
       >
-        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="h-8 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0">
-              <Upload className="mr-2 h-3.5 w-3.5" />
-              Upload
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card text-card-foreground border-border">
-            <DialogHeader>
-              <DialogTitle className="text-foreground">Upload Document</DialogTitle>
-              <DialogDescription className="text-muted-foreground">
-                Upload a new document or a new version of an existing one.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col gap-4 py-4">
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs text-muted-foreground">File</Label>
-                <div className="flex h-32 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 transition-colors hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50">
-                  <div className="flex flex-col items-center gap-2">
-                    <Plus className="h-6 w-6 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">
-                      Drop files here or click to browse
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs text-muted-foreground">Title</Label>
-                <Input
-                  placeholder="Document title"
-                  className="bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs text-muted-foreground">Access</Label>
-                <Select>
-                  <SelectTrigger className="bg-secondary/50 border-border text-foreground">
-                    <SelectValue placeholder="Select access level" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover text-popover-foreground border-border">
-                    <SelectItem value="private">Private</SelectItem>
-                    <SelectItem value="team">Team</SelectItem>
-                    <SelectItem value="public">All users</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setUploadOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
-                Cancel
-              </Button>
-              <Button className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0">
-                Upload
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </PageHeader>
 
       <div className="flex-1 overflow-auto p-6">
@@ -259,14 +509,22 @@ export default function DocumentsPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search documents..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-9 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground text-xs"
+              placeholder="Поиск документов..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setSearch(searchInput);
+                }
+              }}
+              className="h-8 pl-9 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground text-xs tracking-wide"
             />
             {search && (
               <button
-                onClick={() => setSearch("")}
+                onClick={() => {
+                  setSearchInput("")
+                  setSearch("")
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2"
               >
                 <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
@@ -274,29 +532,278 @@ export default function DocumentsPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary">
-              <Filter className="mr-2 h-3 w-3" />
-              Filter
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 text-xs bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary">
-              <ArrowUpDown className="mr-2 h-3 w-3" />
-              Sort
-            </Button>
+
+            <Dialog
+              open={uploadOpen}
+              onOpenChange={(open) => {
+                setUploadOpen(open)
+                if (!open) resetUploadForm()
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm" className="h-8 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 tracking-wide">
+                  <Upload className="h-3.5 w-3.5" />
+                  Загрузить
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card text-card-foreground border-border">
+                <DialogHeader>
+                  <DialogTitle className="text-foreground tracking-wide">Upload Document</DialogTitle>
+                  <DialogDescription className="text-muted-foreground tracking-wide">
+                    Загрузите новый документ
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-4 py-4">
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs text-muted-foreground">File</Label>
+
+                    <input
+                      type="file"
+                      ref={hiddenFileInput}
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+
+                    <div
+                      onClick={() => hiddenFileInput.current?.click()}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const file = e.dataTransfer.files?.[0]
+                        if (file) handleFileSelect({ target: { files: [file] } } as any)
+                      }}
+                      className="flex h-28 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 transition-colors hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50"
+                    >
+
+                      {uploadFile ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm text-foreground">{uploadFile.name}</span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setUploadFile(null)
+                              setUploadType("")
+                              if (hiddenFileInput.current) hiddenFileInput.current.value = ""
+                            }}
+                            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <Plus className="h-8 w-8 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground tracking-wide">
+                            Перетащите файл или кликните, чтобы выбрать
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs text-muted-foreground">Title</Label>
+                    <Input
+                      placeholder="Название документа"
+                      value={uploadTitle}
+                      onChange={(e) => setUploadTitle(e.target.value)}
+                      className="bg-secondary/50 border-border text-foreground font-mono"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs text-muted-foreground">Description</Label>
+                    <Textarea
+                      placeholder="Описание документа"
+                      value={uploadDescription}
+                      onChange={(e) => setUploadDescription(e.target.value)}
+                      className="bg-secondary/50 border-border text-foreground font-mono"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs text-muted-foreground">Access</Label>
+                    <Select>
+                      <SelectTrigger className="bg-secondary/50 border-border text-foreground">
+                        <SelectValue placeholder="Select access level" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover text-popover-foreground border-border">
+                        <SelectItem value="private">Private</SelectItem>
+                        <SelectItem value="team">Team</SelectItem>
+                        <SelectItem value="public">All users</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setUploadOpen(false)
+                      resetUploadForm()
+                    }}
+                    className="text-muted-foreground hover:text-foreground hover:bg-secondary tracking-wide"
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    onClick={handleUpload}
+                    disabled={uploadLoading}
+                    className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 tracking-wide"
+                  >
+                    {uploadLoading ? "Загрузка..." : "Загрузить"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs tracking-wide bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                >
+                  <Filter className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-popover text-popover-foreground border-border w-44 p-2">
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Status</span>
+                  <Select
+                    value={filterStatus}
+                    onValueChange={(value) => {
+                      setFilterStatus(value as Document["status"] | "all")
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 text-xs bg-secondary/50 border-border text-foreground">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover text-popover-foreground border-border">
+                      <SelectItem className="text-xs font-mono tracking-wide" value="all">Все</SelectItem>
+                      <SelectItem className="text-xs font-mono tracking-wide" value="active">Активные</SelectItem>
+                      <SelectItem className="text-xs font-mono tracking-wide" value="archived">В архиве</SelectItem>
+                      <SelectItem className="text-xs font-mono tracking-wide" value="draft">Черновики</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Owner</span>
+                  <Select
+                    value={filterOwner}
+                    onValueChange={(value) => {
+                      setFilterOwner(value as string)
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 text-xs bg-secondary/50 border-border text-foreground">
+                      <SelectValue placeholder="Select owner" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover text-popover-foreground border-border">
+                      <SelectItem className="text-xs font-mono tracking-wide" value="all">Все</SelectItem>
+                      <SelectItem className="text-xs font-mono tracking-wide" value="mine">Мои документы</SelectItem>
+                      <SelectItem className="text-xs font-mono tracking-wide" value="others">Остальные</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
           </div>
         </div>
 
         {/* Table */}
         <div className="relative rounded-2xl border border-border/50 bg-card overflow-hidden">
+
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 backdrop-blur-sm">
+              <div className="h-10 w-10 border-4 border-t-4 border-t-indigo-500 border-gray-300 rounded-full animate-spin"></div>
+            </div>
+          )}
+
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/30 to-transparent" />
           <Table>
             <TableHeader>
               <TableRow className="border-border/50 hover:bg-transparent">
-                <TableHead className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">Document</TableHead>
-                <TableHead className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">Owner</TableHead>
-                <TableHead className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium text-center">Version</TableHead>
-                <TableHead className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium text-center">Shared</TableHead>
-                <TableHead className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">Status</TableHead>
-                <TableHead className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">Modified</TableHead>
+                <TableHead
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium"
+                  onClick={() => handleSort("title")}
+                >
+                  <div className="flex items-center gap-1 justify-start">
+                    Document
+                    {sortField === "title" && (
+                      sortDirection === "asc"
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium"
+                  onClick={() => handleSort("owner_full_name")}
+                >
+                  <div className="flex items-center gap-1 justify-start">
+                    Owner
+                    {sortField === "owner_full_name" && (
+                      sortDirection === "asc"
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium text-center"
+                  onClick={() => handleSort("version")}
+                >
+                  <div className="flex items-center gap-1 justify-start">
+                    Version
+                    {sortField === "version" && (
+                      sortDirection === "asc"
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium text-center"
+                  onClick={() => handleSort("shared_with")}
+                >
+                  <div className="flex items-center gap-1 justify-start">
+                    Shared
+                    {sortField === "shared_with" && (
+                      sortDirection === "asc"
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium"
+                  onClick={() => handleSort("status")}
+                >
+                  <div className="flex items-center gap-1 justify-start">
+                    Status
+                    {sortField === "status" && (
+                      sortDirection === "asc"
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium"
+                  onClick={() => handleSort("updated_at")}
+                >
+                  <div className="flex items-center gap-1 justify-start">
+                    Modified
+                    {sortField === "updated_at" && (
+                      sortDirection === "asc"
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
                 <TableHead className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -315,7 +822,7 @@ export default function DocumentsPage() {
                       {getFileIcon(doc.type)}
                       <div className="flex flex-col">
                         <span className="text-xs font-medium text-foreground">
-                          {doc.title}
+                          {doc.title}.{doc.type}
                         </span>
                         <span className="text-[10px] text-muted-foreground font-mono">
                           {doc.size}
@@ -323,8 +830,15 @@ export default function DocumentsPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {doc.owner_email}
+                  <TableCell className="text-xs text-muted-foreground tracking-wide">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-foreground">
+                        {formatOwnerName(doc.owner_full_name)}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {doc.owner_email}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <span className="font-mono text-xs text-muted-foreground">
@@ -333,14 +847,19 @@ export default function DocumentsPage() {
                   </TableCell>
                   <TableCell className="text-center">
                     <span className="font-mono text-xs text-muted-foreground">
-                      {doc.sharedWith}
+                      {doc.shared_with}
                     </span>
                   </TableCell>
-                  <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                  <TableCell>{getStatusBadge(doc.status, false, true)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      <span className="text-[10px]">{doc.updated_at}</span>
+                      <span
+                        className="text-[10px] tracking-wide"
+                        title={new Date(doc.updated_at).toLocaleString()}
+                      >
+                        {formatRelativeDate(doc.updated_at)}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -351,22 +870,40 @@ export default function DocumentsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover text-popover-foreground border-border w-44">
-                        <DropdownMenuItem className="text-xs">
+                        <DropdownMenuItem className="text-xs tracking-wide font-mono">
                           <Eye className="mr-2 h-3.5 w-3.5" />
-                          View Details
+                          Сведения
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs">
+                        <DropdownMenuItem className="text-xs tracking-wide font-mono">
                           <Download className="mr-2 h-3.5 w-3.5" />
-                          Download
+                          Скачать
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs">
+                        <DropdownMenuItem className="text-xs tracking-wide font-mono">
                           <Share2 className="mr-2 h-3.5 w-3.5" />
-                          Share
+                          Поделиться
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-xs tracking-wide font-mono"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setSelectedDoc(doc);
+                            setUploadVersionOpen(true);
+                          }}
+                        >
+                          <Upload className="mr-2 h-3.5 w-3.5" />
+                          Загрузить новую версию
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-border" />
-                        <DropdownMenuItem className="text-xs text-destructive">
+                        <DropdownMenuItem
+                          className="text-xs text-destructive tracking-wide font-mono"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDocToDelete(doc);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
                           <Trash2 className="mr-2 h-3.5 w-3.5" />
-                          Delete
+                          Удалить
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -377,31 +914,178 @@ export default function DocumentsPage() {
           </Table>
         </div>
 
+
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="bg-card text-card-foreground border-border max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">
+                Delete Document
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground tracking-wide">
+                Вы уверены, что хотите удалить документ{" "}
+                <span className="font-mono font-semibold text-foreground">{docToDelete?.title}.{docToDelete?.type}</span>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col gap-4 py-4">
+              <div className="flex items-center gap-3">
+                <Trash2 className="h-10 w-10 text-destructive/70" />
+                <span className="text-xs text-muted-foreground tracking-wide font-mono">
+                  После удаления документ будет полностью удалён из системы и восстановить его будет невозможно.
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setDeleteDialogOpen(false)}
+                className="text-muted-foreground hover:text-foreground hover:bg-secondary tracking-wide font-mono"
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={handleDelete}
+                className="bg-gradient-to-r from-rose-500 to-red-600 text-primary-foreground hover:opacity-90 border-0 tracking-wide font-mono"
+              >
+                Удалить
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+
         {/* Pagination */}
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {"Showing "}
-            <span className="font-mono text-foreground">{filtered.length}</span>
-            {" of "}
+          <span className="text-xs text-muted-foreground tracking-wide">
+            {"Показано "}
             <span className="font-mono text-foreground">{documents.length}</span>
-            {" documents"}
+            {" из "}
+            <span className="font-mono text-foreground">{totalCount}</span>
+            {" документов"}
           </span>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary" disabled>
+            {/* Prev */}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="sm" className="h-7 min-w-7 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0 text-xs">
-              1
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 min-w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs">
-              2
-            </Button>
-            <Button variant="outline" size="icon" className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary">
+
+            {/* Номера страниц */}
+            {Array.from({ length: totalPages }, (_, i) => {
+              const pageNumber = i + 1
+              const isActive = pageNumber === page
+
+              return (
+                <Button
+                  key={pageNumber}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(pageNumber)}
+                  className={`h-7 min-w-7 text-xs ${isActive
+                    ? "bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0"
+                    : "bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    }`}
+                >
+                  {pageNumber}
+                </Button>
+              )
+            })}
+
+            {/* Next */}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
               <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
+
       </div>
+      <Dialog open={uploadVersionOpen} onOpenChange={setUploadVersionOpen}>
+        <DialogContent className="bg-card text-card-foreground border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload New Version</DialogTitle>
+            <DialogDescription>
+              Загрузите новый файл для документа {selectedDoc?.title}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-4">
+            <input
+              type="file"
+              ref={hiddenFileInput}
+              onChange={handleFileSelectVersion}
+              className="hidden"
+            />
+            <div
+              onClick={() => hiddenFileInput.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleFileSelectVersion({ target: { files: [file] } } as any);
+              }}
+              className="flex h-28 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 transition-colors hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50"
+            >
+              {uploadFileVersion ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm text-foreground">{uploadFileVersion.name}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUploadFileVersion(null);
+                      if (hiddenFileInput.current) hiddenFileInput.current.value = "";
+                    }}
+                    className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Plus className="h-8 w-8 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground tracking-wide">
+                    Перетащите файл или кликните, чтобы выбрать
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setUploadVersionOpen(false);
+                setUploadFileVersion(null);
+              }}
+              className="text-muted-foreground hover:text-foreground hover:bg-secondary tracking-wide font-mono"
+            >
+              Отмена
+            </Button>
+            <Button
+              onClick={handleUploadVersion}
+              disabled={!uploadFileVersion || uploadLoadingVersion}
+              className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 tracking-wide font-mono"
+            >
+              {uploadLoadingVersion ? "Загрузка..." : "Загрузить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Document Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
@@ -414,7 +1098,7 @@ export default function DocumentsPage() {
                     {getFileIcon(selectedDoc.type)}
                   </div>
                   <div>
-                    <DialogTitle className="text-foreground text-sm">{selectedDoc.title}</DialogTitle>
+                    <DialogTitle className="text-foreground text-sm">{selectedDoc.title}.{selectedDoc.type}</DialogTitle>
                     <DialogDescription className="text-muted-foreground text-xs">
                       {selectedDoc.size} - Version {selectedDoc.version}
                     </DialogDescription>
@@ -425,41 +1109,193 @@ export default function DocumentsPage() {
               <div className="flex flex-col gap-3 py-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Owner</span>
-                  <span className="text-foreground font-medium">{selectedDoc.owner_email}</span>
+                  <span className="text-foreground font-medium tracking-wide">
+                    <div className="text-right">
+                      <div className="text-foreground font-medium text-xs">
+                        {formatOwnerName(selectedDoc.owner_full_name)}
+                      </div>
+                      <div className="text-muted-foreground text-[10px]">
+                        {selectedDoc.owner_email}
+                      </div>
+                    </div>
+                  </span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                {/* <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Status</span>
                   {getStatusBadge(selectedDoc.status)}
+                </div> */}
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-xs">Status</span>
+
+                  {currentUser?.email === selectedDoc?.owner_email ? (
+                    <div className="flex gap-2">
+                      {(["active", "archived", "draft"] as Document["status"][]).map((s) => {
+                        const isSelected = selectedDoc.status === s
+                        return (
+                          <div
+                            key={s}
+                            className="cursor-pointer"
+                            onClick={() => handleStatusChange(s)}
+                          >
+                            {getStatusBadge(s, isSelected)}
+                          </div>
+                        )
+                      })}
+
+                    </div>
+                  ) : (
+                    <div>{getStatusBadge(selectedDoc.status)}</div>
+                  )}
                 </div>
+
+
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Shared With</span>
-                  <span className="text-foreground font-mono">{selectedDoc.sharedWith} users</span>
+                  <span className="text-foreground font-mono">{selectedDoc.shared_with} users</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Created At</span>
+                  <span className="text-foreground tracking-wide font-mono">
+                    {new Date(selectedDoc.created_at).toLocaleString("ru-RU", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Last Modified</span>
-                  <span className="text-foreground">{selectedDoc.updated_at}</span>
+                  <span className="text-foreground tracking-wide font-mono">
+                    {new Date(selectedDoc.updated_at).toLocaleString("ru-RU", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </span>
                 </div>
                 <Separator className="bg-border/50" />
-                <div>
-                  <span className="text-xs text-muted-foreground">Version History</span>
+                <div className="flex flex-col gap-1 min-h-[2rem]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground text-xs">Description</span>
+
+                    {currentUser?.email === selectedDoc?.owner_email &&
+                      editingDocId !== selectedDoc?.id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          onClick={() => setEditingDocId(selectedDoc.id)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                  </div>
+
+                  {editingDocId === selectedDoc?.id ? (
+                    <div className="flex gap-2 items-center">
+                      <Textarea
+                        value={descriptionEdit}
+                        ref={textareaRef}
+                        onChange={(e) => setDescriptionEdit(e.target.value)}
+                        className="text-xs bg-secondary/50 border-border text-foreground font-mono resize-none overflow-hidden min-h-[24px] leading-snug"
+                      />
+
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          if (!selectedDoc) return
+                          try {
+                            await updateDocument(selectedDoc.id, {
+                              description: descriptionEdit,
+                            })
+
+                            setDocuments((docs) =>
+                              docs.map((doc) =>
+                                doc.id === selectedDoc.id
+                                  ? { ...doc, description: descriptionEdit }
+                                  : doc
+                              )
+                            )
+
+                            setSelectedDoc((doc) =>
+                              doc ? { ...doc, description: descriptionEdit } : null
+                            )
+
+                            setEditingDocId(null)
+                          } catch (error) {
+                            console.error("Failed to update description", error)
+                          }
+                        }}
+                        className="h-8 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground text-xs border-0 hover:opacity-90"
+                      >
+                        Save
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (selectedDoc) {
+                            setDescriptionEdit(selectedDoc.description || "")
+                          }
+                          setEditingDocId(null)
+                        }}
+                        className="h-8 text-xs"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-foreground text-xs whitespace-pre-wrap">
+                      {selectedDoc?.description || "Описание отсутствует"}
+                    </p>
+                  )}
+                </div>
+
+
+                <Separator className="bg-border/50" />
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Version History</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-[12px] tracking-wide font-mono bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary flex items-center gap-1"
+                      onClick={() => setUploadVersionOpen(true)}
+                    >
+                      <Upload className="h-3 w-3" />
+                      Загрузить версию
+                    </Button>
+                  </div>
+
                   <div className="mt-2 flex flex-col gap-1.5">
                     {Array.from({ length: Math.min(selectedDoc.version, 3) }, (_, i) => (
                       <div key={i} className="flex items-center justify-between rounded-md bg-secondary/30 px-3 py-2 text-xs">
                         <span className="font-mono text-foreground">v{selectedDoc.version - i}</span>
-                        <span className="text-muted-foreground">{i === 0 ? "Current" : `${i * 3} days ago`}</span>
+                        <span className="text-muted-foreground tracking-wide font-mono">
+                          {i === 0
+                            ? "Текущая"
+                            : `${i * 3} ${getDaysWord(i * 3)} назад`}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
               <DialogFooter className="flex gap-2">
-                <Button variant="outline" size="sm" className="bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs">
-                  <Share2 className="mr-2 h-3 w-3" />
-                  Share
+                <Button variant="outline" size="sm" className="bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs tracking-wide font-mono">
+                  <Share2 className="h-3 w-3" />
+                  Поделиться
                 </Button>
-                <Button size="sm" className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 text-xs">
-                  <Download className="mr-2 h-3 w-3" />
-                  Download
+                <Button size="sm" className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 text-xs tracking-wide font-mono">
+                  <Download className="h-3 w-3" />
+                  Скачать
                 </Button>
               </DialogFooter>
             </>

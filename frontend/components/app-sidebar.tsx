@@ -154,7 +154,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Pro upgrade card */}
-        <div className="mx-3 mt-auto group-data-[collapsible=icon]:hidden">
+        {/* <div className="mx-3 mt-auto group-data-[collapsible=icon]:hidden">
           <div className="relative overflow-hidden rounded-xl border border-violet-500/20 bg-gradient-to-br from-violet-600/10 via-purple-600/5 to-cyan-500/10 p-4">
             <div className="absolute top-0 right-0 h-20 w-20 bg-gradient-to-bl from-violet-500/20 to-transparent rounded-bl-full" />
             <div className="relative">
@@ -174,7 +174,7 @@ export function AppSidebar() {
               <p className="text-[10px] text-muted-foreground">1,284 documents stored</p>
             </div>
           </div>
-        </div>
+        </div> */}
       </SidebarContent>
 
       <SidebarFooter>

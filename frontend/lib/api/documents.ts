@@ -1,7 +1,18 @@
 import { API } from "./index";
 
-export const getDocuments = () => API.get("documents/");
-export const getDocument = (id: number) => API.get(`documents/${id}/`);
-export const createDocument = (data: any) => API.post("documents/", data);
-export const updateDocument = (id: number, data: any) => API.put(`documents/${id}/`, data);
-export const deleteDocument = (id: number) => API.delete(`documents/${id}/`);
+interface GetDocumentsParams {
+    search?: string;
+    status?: string;
+    type?: string;
+    owner?: string;
+    ordering?: string;
+    limit?: number;
+    offset?: number;
+}
+
+export const getDocuments = (params?: GetDocumentsParams) => API.get("documents/", { params });
+export const getDocument = (id: string) => API.get(`documents/${id}/`);
+export const createDocument = (data: FormData) => API.post("documents/", data);
+export const updateDocument = (id: string, data: any) => API.patch(`documents/${id}/`, data);
+export const deleteDocument = (id: string) => API.delete(`documents/${id}/`);
+export const uploadDocumentVersion = (documentId: string, data: FormData) => API.post(`documents/${documentId}/upload_version/`, data);
