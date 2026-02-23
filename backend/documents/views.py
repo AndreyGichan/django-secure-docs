@@ -34,7 +34,7 @@ from .utils.pagination import DocumentLimitOffsetPagination
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.filter(is_active=True)
     permission_classes = [IsAuthenticated]
-    pagination_class = DocumentLimitOffsetPagination 
+    pagination_class = DocumentLimitOffsetPagination
 
     filter_backends = [
         DjangoFilterBackend,
@@ -56,10 +56,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):  # type: ignore
         user = self.request.user
-    
-        return Document.objects.filter(is_active=True).filter(
-            Q(owner=user) | Q(access_list__user=user)
-        ).distinct()
+
+        return (
+            Document.objects.filter(is_active=True)
+            .filter(
+                Q(owner=user)
+                | Q(access_list__user=user, access_list__revoked_at__isnull=True)
+                & (
+                    Q(access_list__expires_at__isnull=True)
+                    | Q(access_list__expires_at__gte=timezone.now())
+                )
+            )
+            .distinct()
+        )
 
     def get_serializer_class(self):  # type: ignore
         if self.action == "create":
@@ -308,3 +317,85 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document.save()
 
         return Response({"detail": "Document archived"})
+
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[IsAuthenticated, IsOwnerOrHasAccess],
+    )
+    def access_list(self, request, pk=None):
+        document = self.get_object()
+
+        accesses = (
+            DocumentAccess.objects.filter(document=document)
+            .exclude(user=document.owner)
+            .filter(revoked_at__isnull=True)
+            .filter(Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now()))
+            .select_related("user")
+        )
+
+        data = []
+        for access in accesses:
+            data.append(
+                {
+                    "id": access.id,
+                    "user_id": access.user.id,
+                    "full_name": access.user.full_name,
+                    "email": access.user.email,
+                    "role": access.role,
+                    "granted_at": access.created_at,
+                    "expires_at": access.expires_at,
+                }
+            )
+
+        return Response(data)
+
+    @action(detail=True, methods=["patch"], url_path="access/(?P<user_id>[^/.]+)")
+    def update_access(self, request, pk=None, user_id=None):
+        document = self.get_object()
+        access = get_object_or_404(DocumentAccess, document=document, user_id=user_id)
+
+        role = request.data.get("role")
+        days = request.data.get("days")
+        comment = request.data.get("comment")
+
+        if role:
+            access.role = role
+
+        if days is not None:
+            if days == 0:
+                access.expires_at = None
+            else:
+                access.expires_at = timezone.now() + timedelta(days=int(days))
+
+        if comment is not None:
+            access.comment = comment
+
+        access.save()
+        return Response({"status": "updated"})
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="revoke/(?P<user_id>[^/.]+)",
+        permission_classes=[IsAuthenticated],
+    )
+    def revoke_access(self, request, pk=None, user_id=None):
+        document = self.get_object()
+
+        if document.owner != request.user:
+            return Response(
+                {"detail": "Only owner can revoke access."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        access = get_object_or_404(
+            DocumentAccess,
+            document=document,
+            user_id=user_id,
+        )
+
+        access.revoked_at = timezone.now()
+        access.save()
+
+        return Response({"detail": "Access revoked"})

@@ -63,9 +63,10 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
+import { ShareDocumentDialog } from "@/components/share-document-dialog"
 import { getDocuments } from "@/lib/api/documents";
-import { getCurrentUser } from "@/lib/api/auth"
-import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument } from "@/lib/api/documents"
+import { getCurrentUser, searchUsers } from "@/lib/api/auth"
+import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument, shareDocument } from "@/lib/api/documents"
 
 interface Document {
   id: string
@@ -249,8 +250,18 @@ export default function DocumentsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUserId, setShareUserId] = useState("");
+  const [shareRole, setShareRole] = useState("read");
+  const [shareLoading, setShareLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [userResults, setUserResults] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [shareDoc, setShareDoc] = useState<Document | null>(null)
 
   const hiddenFileInput = useRef<HTMLInputElement>(null)
+
 
   useEffect(() => {
     async function fetchCurrentUser() {
@@ -264,12 +275,14 @@ export default function DocumentsPage() {
     fetchCurrentUser()
   }, [])
 
+
   useEffect(() => {
     if (selectedDoc) {
       setDescriptionEdit(selectedDoc.description || "")
     }
     setEditingDocId(null)
   }, [selectedDoc])
+
 
   useEffect(() => {
     if (searchInput.trim() === "") {
@@ -287,6 +300,7 @@ export default function DocumentsPage() {
 
     return () => clearTimeout(handler);
   }, [searchInput]);
+
 
   async function fetchDocuments() {
     if (!currentUser) return;
@@ -333,12 +347,15 @@ export default function DocumentsPage() {
     }
   }
 
+
   useEffect(() => {
     fetchDocuments();
   }, [search, filterStatus, filterOwner, sortField, sortDirection, currentUser, page]);
 
+
   const filtered = documents;
   const totalPages = Math.ceil(totalCount / pageSize);
+
 
   useEffect(() => {
     if (editingDocId && textareaRef.current) {
@@ -347,6 +364,7 @@ export default function DocumentsPage() {
       ta.style.height = ta.scrollHeight + "px"
     }
   }, [editingDocId, descriptionEdit])
+
 
   const handleStatusChange = async (status: Document["status"]) => {
     if (!selectedDoc) return;
@@ -373,6 +391,7 @@ export default function DocumentsPage() {
     }
   };
 
+
   const handleSort = (field: keyof Document) => {
     if (sortField === field) {
       if (sortDirection === "asc") {
@@ -386,6 +405,7 @@ export default function DocumentsPage() {
       setSortDirection("asc");
     }
   };
+
 
   const handleUpload = async () => {
     if (!uploadFile || !uploadTitle) {
@@ -419,6 +439,8 @@ export default function DocumentsPage() {
       setUploadLoading(false)
     }
   }
+
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -428,6 +450,7 @@ export default function DocumentsPage() {
     setUploadType(extension)
   }
 
+
   const resetUploadForm = () => {
     setUploadFile(null)
     setUploadTitle("")
@@ -435,11 +458,13 @@ export default function DocumentsPage() {
     setUploadType("")
   }
 
+
   const handleFileSelectVersion = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadFileVersion(file);
   };
+
 
   const handleUploadVersion = async () => {
     if (!uploadFileVersion || !selectedDoc) return;
@@ -463,12 +488,14 @@ export default function DocumentsPage() {
     }
   };
 
+
   const getDaysWord = (days: number) => {
     if (days % 10 === 1 && days % 100 !== 11) return "день";
     if ([2, 3, 4].includes(days % 10) && ![12, 13, 14].includes(days % 100))
       return "дня";
     return "дней";
   };
+
 
   const handleDelete = async () => {
     if (!docToDelete) return;
@@ -491,7 +518,57 @@ export default function DocumentsPage() {
   };
 
 
-  // if (loading) return <div className="p-6 text-xs text-muted-foreground tracking-wide">Загрузка документов...</div>
+  useEffect(() => {
+    const handler = setTimeout(async () => {
+      if (userSearch.trim().length < 1) {
+        setUserResults([]);
+        return;
+      }
+
+      try {
+        setUserSearchLoading(true);
+        const res = await searchUsers(userSearch); // API возвращает filtered users
+        setUserResults(res.data);
+      } catch (error) {
+        console.error("User search error", error);
+      } finally {
+        setUserSearchLoading(false);
+      }
+    }, 500); // debounce 300ms
+
+    return () => clearTimeout(handler);
+  }, [userSearch]);
+
+
+  const handleShare = async () => {
+    if (!selectedDoc || !shareUserId) {
+      alert("Выберите пользователя");
+      return;
+    }
+
+    try {
+      setShareLoading(true);
+
+      await shareDocument(selectedDoc.id, {
+        user_id: shareUserId,
+        role: shareRole,
+      });
+
+      setShareOpen(false);
+      setSelectedUser(null);
+      setUserSearch("");
+      setUserResults([]);
+      setShareRole("read");
+
+      await fetchDocuments();
+    } catch (error: any) {
+      console.error("Share error", error);
+      alert(error?.response?.data?.detail || "Ошибка при выдаче доступа");
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-1 flex-col">
@@ -878,7 +955,14 @@ export default function DocumentsPage() {
                           <Download className="mr-2 h-3.5 w-3.5" />
                           Скачать
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs tracking-wide font-mono">
+                        <DropdownMenuItem
+                          className="text-xs tracking-wide font-mono"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setShareDoc(doc)
+                            setShareOpen(true)
+                          }}
+                        >
                           <Share2 className="mr-2 h-3.5 w-3.5" />
                           Поделиться
                         </DropdownMenuItem>
@@ -923,7 +1007,7 @@ export default function DocumentsPage() {
               </DialogTitle>
               <DialogDescription className="text-muted-foreground tracking-wide">
                 Вы уверены, что хотите удалить документ{" "}
-                <span className="font-mono font-semibold text-foreground">{docToDelete?.title}.{docToDelete?.type}</span>
+                <span className="font-mono font-semibold text-foreground">{docToDelete?.title}.{docToDelete?.type}</span>?
               </DialogDescription>
             </DialogHeader>
 
@@ -955,6 +1039,18 @@ export default function DocumentsPage() {
         </Dialog>
 
 
+        {/* Share Document Dialog */}
+        {shareDoc && (
+          <ShareDocumentDialog
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            documentTitle={shareDoc.title}
+            documentId={shareDoc.id}
+            documentType={shareDoc.type}
+          />
+        )}
+
+
         {/* Pagination */}
         <div className="mt-4 flex items-center justify-between">
           <span className="text-xs text-muted-foreground tracking-wide">
@@ -976,7 +1072,6 @@ export default function DocumentsPage() {
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
 
-            {/* Номера страниц */}
             {Array.from({ length: totalPages }, (_, i) => {
               const pageNumber = i + 1
               const isActive = pageNumber === page
@@ -1289,7 +1384,16 @@ export default function DocumentsPage() {
                 </div>
               </div>
               <DialogFooter className="flex gap-2">
-                <Button variant="outline" size="sm" className="bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs tracking-wide font-mono">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs tracking-wide font-mono"
+                  onClick={() => {
+                    setDetailOpen(false)
+                    setShareDoc(selectedDoc)
+                    setShareOpen(true)
+                  }}
+                >
                   <Share2 className="h-3 w-3" />
                   Поделиться
                 </Button>

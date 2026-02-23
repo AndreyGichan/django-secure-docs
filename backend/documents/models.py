@@ -93,8 +93,20 @@ class DocumentAccess(models.Model):
     )
 
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
-
     encrypted_dek = models.BinaryField(blank=True, null=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    revoked_at = models.DateTimeField(blank=True, null=True)
+    comment = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ('document', 'user')
+
+    @property
+    def is_active(self):
+        if self.revoked_at:
+            return False
+        if self.expires_at and self.expires_at < timezone.now():
+            return False
+        return True
