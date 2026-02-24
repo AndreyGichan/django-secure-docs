@@ -2,13 +2,20 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, Eye, EyeOff, ArrowRight } from "lucide-react"
+import { FileText, Eye, EyeOff, ArrowRight, KeyRound, Download, Copy, Check, ShieldCheck, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+    Dialog,
+    DialogContent,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import { register, login as loginUser } from "@/lib/api/auth";
+import { generateKeyPair, toPEM } from "@/lib/keys";
+
 
 export default function RegisterPage() {
     const router = useRouter()
@@ -21,6 +28,12 @@ export default function RegisterPage() {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
+    const [keyModalOpen, setKeyModalOpen] = useState(false)
+    const [keySaved, setKeySaved] = useState(false)
+    const [copied, setCopied] = useState(false)
+    const [downloaded, setDownloaded] = useState(false)
+    const [generatedPrivateKey, setGeneratedPrivateKey] = useState<string | null>(null);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -35,16 +48,25 @@ export default function RegisterPage() {
         }
 
         try {
+
+            const keys = await generateKeyPair();
+            const privatePEM = toPEM(keys.privateKey, "PRIVATE");
+            const publicPEM = toPEM(keys.publicKey, "PUBLIC");
+
+            setGeneratedPrivateKey(privatePEM);
+
             await register({
                 email,
                 password1: password,
                 password2: confirmPassword,
                 full_name: fullName,
+                public_key: publicPEM,
             });
 
             await loginUser({ email, password });
+            setKeyModalOpen(true)
 
-            router.push("/dashboard");
+            // router.push("/dashboard");
         } catch (err: any) {
             setError(
                 err.response?.data?.email?.[0] ||
@@ -56,6 +78,44 @@ export default function RegisterPage() {
             setLoading(false);
         }
     }
+
+    const handleDownloadKey = () => {
+        if (!generatedPrivateKey) return;
+
+        const blob = new Blob([generatedPrivateKey], { type: "application/x-pem-file" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = "docvault_private_key.pem"
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        setDownloaded(true)
+    }
+
+    const handleCopyKey = async () => {
+        try {
+            await navigator.clipboard.writeText(generatedPrivateKey || "")
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2500)
+        } catch {
+            const textarea = document.createElement("textarea")
+            textarea.value = generatedPrivateKey || ""
+            document.body.appendChild(textarea)
+            textarea.select()
+            document.execCommand("copy")
+            document.body.removeChild(textarea)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2500)
+        }
+    }
+
+    const handleContinue = () => {
+        setKeyModalOpen(false)
+        router.push("/dashboard")
+    }
+
 
     return (
         <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-background">
@@ -236,6 +296,125 @@ export default function RegisterPage() {
                     </div>
                 </div>
             </div>
+
+            <Dialog open={keyModalOpen} onOpenChange={() => { /* prevent closing by clicking outside */ }}>
+                <DialogContent
+                    className="bg-card text-card-foreground border-border max-w-[35rem] p-0 gap-0 overflow-hidden [&>button]:hidden"
+                    onPointerDownOutside={(e) => e.preventDefault()}
+                    onEscapeKeyDown={(e) => e.preventDefault()}
+                >
+                    <DialogTitle className="sr-only">Your Private Key</DialogTitle>
+                    {/* Header with animated key icon */}
+                    <div className="relative flex flex-col items-center px-6 pt-8 pb-5 text-center">
+                        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent" />
+                        <div className="absolute -top-20 left-1/2 -translate-x-1/2 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl" />
+
+                        <div className="relative">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 shadow-xl shadow-emerald-500/25">
+                                <KeyRound className="h-8 w-8 text-white" />
+                            </div>
+                            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 opacity-20 blur-lg animate-pulse" />
+                            {/* Success checkmark overlay */}
+                            <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 border-2 border-card shadow-lg">
+                                <Check className="h-3 w-3 text-white" />
+                            </div>
+                        </div>
+
+                        <h2 className="relative mt-5 text-lg font-bold text-foreground">
+                            Your Private Key Has Been Created!
+                        </h2>
+                        <p className="relative mt-2 text-sm font-mono text-muted-foreground leading-relaxed max-w-lg">
+                            Сохраните ключ в надежном месте. Без него вы не сможете расшифровать документы.
+                        </p>
+                    </div>
+
+                    {/* Key preview */}
+                    <div className="px-6">
+                        <div className="rounded-xl bg-background/80 border border-border/50 p-3 font-mono text-[12px] text-muted-foreground leading-relaxed max-h-[200px] overflow-y-auto">
+                            <pre className="whitespace-pre-wrap break-all">{generatedPrivateKey}</pre>
+                        </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-3 px-6 mt-4">
+                        <Button
+                            onClick={handleDownloadKey}
+                            className={`flex-1 h-10 text-xs font-semibold font-mono tracking-wide transition-all duration-300 ${downloaded
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
+                                : "bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:from-violet-500 hover:to-cyan-400 border-0 shadow-lg shadow-violet-500/20"
+                                }`}
+                            variant={downloaded ? "outline" : "default"}
+                        >
+                            {downloaded ? (
+                                <>
+                                    <Check className="h-3.5 w-3.5" />
+                                    Скачано
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="h-3.5 w-3.5" />
+                                    Скачать .pem
+                                </>
+                            )}
+                        </Button>
+
+                        <Button
+                            onClick={handleCopyKey}
+                            variant="outline"
+                            className={`flex-1 h-10 text-xs font-semibold font-mono tracking-wide border-border transition-all duration-300 ${copied
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                : "bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                                }`}
+                        >
+                            {copied ? (
+                                <>
+                                    <Check className="h-3.5 w-3.5" />
+                                    Скопировано
+                                </>
+                            ) : (
+                                <>
+                                    <Copy className="h-3.5 w-3.5" />
+                                    Скопировать
+                                </>
+                            )}
+                        </Button>
+                    </div>
+
+                    {/* Warning */}
+                    <div className="mx-6 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/5 border border-amber-500/15 px-3 py-3">
+                        <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-2" />
+                        <p className="text-[12px] text-amber-400/80 leading-relaxed font-mono">
+                        При потере приватного ключа восстановить доступ к ранее загруженным документам будет невозможно. Храните его в безопасном месте.
+                        </p>
+                    </div>
+
+                    {/* Confirm + continue */}
+                    <div className="px-6 pt-4 pb-6 flex flex-col gap-3">
+                        <div className="flex items-center gap-3 rounded-xl bg-secondary/30 border border-border/50 px-4 py-3">
+                            <Checkbox
+                                id="key-saved"
+                                checked={keySaved}
+                                onCheckedChange={(v) => setKeySaved(v === true)}
+                                className="border-border data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                            />
+                            <label htmlFor="key-saved" className="text-xs text-foreground font-mono cursor-pointer font-medium">
+                                Я сохранил ключ в безопасном месте
+                            </label>
+                        </div>
+
+                        <Button
+                            onClick={handleContinue}
+                            disabled={!keySaved}
+                            className="h-10 w-full bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:from-violet-500 hover:to-cyan-400 border-0 text-sm font-semibold tracking-wide shadow-lg shadow-violet-500/20 transition-all duration-300 hover:shadow-violet-500/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                        >
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="h-4 w-4" />
+                                Продолжить
+                            </div>
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -6,13 +6,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "email", "full_name", "public_key"]
-        read_only_fields = ["public_key"]
 
 
 class CustomRegisterSerializer(RegisterSerializer):
     username = None 
     full_name = serializers.CharField(required=True)
     email = serializers.EmailField(required=True) 
+    public_key = serializers.CharField(required=True)
 
     def validate_email(self, email):
         if User.objects.filter(email=email).exists():
@@ -32,6 +32,7 @@ class CustomRegisterSerializer(RegisterSerializer):
         email=data['email'],
         password=data['password1'],
         full_name=data['full_name'],
-        role='employee'  
+        role='employee', 
+        public_key=self.validated_data.get('public_key')  # type: ignore
         )
         return user

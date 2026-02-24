@@ -14,23 +14,23 @@ class UserManager(BaseUserManager):
         
         email = self.normalize_email(email)
 
-        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        # key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-        private_key_pem = key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
-        )
-        public_key_pem = key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
+        # private_key_pem = key.private_bytes(
+        #     encoding=serialization.Encoding.PEM,
+        #     format=serialization.PrivateFormat.PKCS8,
+        #     encryption_algorithm=serialization.NoEncryption()
+        # )
+        # public_key_pem = key.public_key().public_bytes(
+        #     encoding=serialization.Encoding.PEM,
+        #     format=serialization.PublicFormat.SubjectPublicKeyInfo
+        # )
 
         user = self.model(
             email=email,
             role=role,
-            public_key=public_key_pem.decode('utf-8'),
-            private_key=private_key_pem.decode('utf-8'),
+            # public_key=public_key_pem.decode('utf-8'),
+            # private_key=private_key_pem.decode('utf-8'),
             **extra_fields
         )
         user.set_password(password)
@@ -50,7 +50,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
 
     public_key = models.TextField(blank=True, null=True)
-    private_key = models.TextField(blank=True, null=True)
+    # private_key = models.TextField(blank=True, null=True)
     
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

@@ -1,3 +1,4 @@
+import base64
 from rest_framework import serializers
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 from django.contrib.auth import get_user_model
@@ -6,7 +7,7 @@ from .utils.crypto import (
     generate_dek,
     encrypt_file,
     encrypt_dek_for_user,
-    decrypt_dek_for_user,
+    # decrypt_dek_for_user,
 )
 from audit.utils.audit import log_action
 from config.constants import AuditAction
@@ -160,6 +161,7 @@ class ShareDocumentSerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
     role = serializers.ChoiceField(choices=DocumentAccess.ROLE_CHOICES)
     days = serializers.IntegerField(required=False, min_value=1)
+    encrypted_dek = serializers.CharField()
 
     def validate(self, attrs):
         document = self.context["document"]
@@ -175,15 +177,18 @@ class ShareDocumentSerializer(serializers.Serializer):
         new_user = User.objects.get(id=validated_data["user_id"])
         owner = document.owner
 
-        owner_access = DocumentAccess.objects.get(document=document, user=owner)
+        # owner_access = DocumentAccess.objects.get(document=document, user=owner)
 
-        if owner_access.encrypted_dek is None:
-            raise serializers.ValidationError("DEK для владельца отсутствует!")
+        # if owner_access.encrypted_dek is None:
+        #     raise serializers.ValidationError("DEK для владельца отсутствует!")
 
-        dek = decrypt_dek_for_user(
-            owner_access.encrypted_dek, owner.private_key.encode()
-        )
-        encrypted_dek = encrypt_dek_for_user(dek, new_user.public_key.encode())  # type: ignore
+        # # dek = decrypt_dek_for_user(
+        # #     owner_access.encrypted_dek, owner.private_key.encode()
+        # # )
+        # encrypted_dek = encrypt_dek_for_user(dek, new_user.public_key.encode())  # type: ignore
+
+        encrypted_dek_base64 = validated_data["encrypted_dek"]
+        encrypted_dek = base64.b64decode(encrypted_dek_base64)
 
         days = validated_data.get("days")
         expires_at = timezone.now() + timedelta(days=days) if days else None

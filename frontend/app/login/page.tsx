@@ -23,6 +23,8 @@ export default function LoginPage() {
     setLoading(true)
     setError("");
 
+    console.log("Trying login with:", { email, password });
+
     try {
       const res = await login({ email, password });
       console.log("Успешно вошли:", res.data);

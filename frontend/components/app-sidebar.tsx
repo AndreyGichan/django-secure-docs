@@ -12,6 +12,7 @@ import {
   ChevronDown,
   User,
   Sparkles,
+  KeyRound,
 } from "lucide-react"
 
 import {
@@ -48,6 +49,12 @@ const mainNav = [
     href: "/dashboard/documents",
     icon: FileText,
     color: "text-cyan-400",
+  },
+  {
+    title: "Decryption",
+    href: "/dashboard/decryption",
+    icon: KeyRound,
+    color: "text-emerald-400",
   },
 ]
 
@@ -205,9 +212,11 @@ export function AppSidebar() {
                 align="start"
                 className="w-56 bg-popover text-popover-foreground"
               >
-                <DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/profile">
                   <User className="mr-2 h-4 w-4" />
                   Profile
+                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

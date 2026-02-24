@@ -23,7 +23,7 @@ from .serializers import (
     DownloadLinkSerializer,
 )
 from .permissions import IsOwnerOrHasAccess, CanEditDocument
-from .utils.crypto import encrypt_file, decrypt_dek_for_user, decrypt_file
+# from .utils.crypto import encrypt_file, decrypt_dek_for_user, decrypt_file
 from audit.utils.audit import log_action
 from config.constants import AuditAction
 from audit.utils.request import get_client_ip
@@ -42,7 +42,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter,
     ]
     filterset_class = DocumentFilter
-    search_fields = ["title", "description", "owner__email"]
+    search_fields = ["title", "type", "description", "owner__full_name", "owner__email"]
     ordering_fields = [
         "created_at",
         "updated_at",
@@ -57,18 +57,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):  # type: ignore
         user = self.request.user
 
-        return (
-            Document.objects.filter(is_active=True)
-            .filter(
-                Q(owner=user)
-                | Q(access_list__user=user, access_list__revoked_at__isnull=True)
-                & (
-                    Q(access_list__expires_at__isnull=True)
-                    | Q(access_list__expires_at__gte=timezone.now())
-                )
-            )
-            .distinct()
-        )
+        qs = Document.objects.filter(is_active=True).filter(
+            Q(owner=user) |
+            Q(access_list__user=user, access_list__revoked_at__isnull=True,
+            access_list__expires_at__gte=timezone.now()) |
+            Q(access_list__user=user, access_list__revoked_at__isnull=True,
+            access_list__expires_at__isnull=True)
+        ).distinct()
+
+        return qs
 
     def get_serializer_class(self):  # type: ignore
         if self.action == "create":
@@ -107,19 +104,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             file = serializer.validated_data["file"]
 
-            access = DocumentAccess.objects.get(document=document, user=user)
-            dek = decrypt_dek_for_user(access.encrypted_dek, user.private_key.encode())
+            # access = DocumentAccess.objects.get(document=document, user=user)
+            # dek = decrypt_dek_for_user(access.encrypted_dek, user.private_key.encode())
 
-            file_bytes = file.read()
-            encrypted_bytes = encrypt_file(file_bytes, dek)
-            encrypted_file = ContentFile(encrypted_bytes, name=file.name + ".enc")
+            # file_bytes = file.read()
+            # encrypted_bytes = encrypt_file(file_bytes, dek)
+            # encrypted_file = ContentFile(encrypted_bytes, name=file.name + ".enc")
 
-            last_version = document.versions.first()
+            last_version = document.versions.order_by("-version_number").first()
             new_version_number = last_version.version_number + 1 if last_version else 1
 
             DocumentVersion.objects.create(
                 document=document,
-                file=encrypted_file,
+                # file=encrypted_file,
+                file=file,
                 version_number=new_version_number,
                 uploaded_by=user,
                 status="pending",
@@ -279,32 +277,32 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         return Response({"encrypted_dek": encoded_dek})
 
-    @action(
-        detail=True,
-        methods=["get"],
-        permission_classes=[IsAuthenticated, IsOwnerOrHasAccess],
-    )
-    def decrypt(self, request, pk=None):
-        document = self.get_object()
+    # @action(
+    #     detail=True,
+    #     methods=["get"],
+    #     permission_classes=[IsAuthenticated, IsOwnerOrHasAccess],
+    # )
+    # def decrypt(self, request, pk=None):
+    #     document = self.get_object()
 
-        access = DocumentAccess.objects.get(document=document, user=request.user)
+    #     access = DocumentAccess.objects.get(document=document, user=request.user)
 
-        dek = decrypt_dek_for_user(
-            access.encrypted_dek, request.user.private_key.encode()
-        )
+    #     dek = decrypt_dek_for_user(
+    #         access.encrypted_dek, request.user.private_key.encode()
+    #     )
 
-        version = document.versions.first()
-        encrypted_bytes = version.file.read()
-        decrypted_bytes = decrypt_file(encrypted_bytes, dek)
+    #     version = document.versions.first()
+    #     encrypted_bytes = version.file.read()
+    #     decrypted_bytes = decrypt_file(encrypted_bytes, dek)
 
-        file_like = BytesIO(decrypted_bytes)
+    #     file_like = BytesIO(decrypted_bytes)
 
-        response = FileResponse(
-            file_like,
-            as_attachment=True,
-            filename=version.file.name.replace(".enc", ""),
-        )
-        return response
+    #     response = FileResponse(
+    #         file_like,
+    #         as_attachment=True,
+    #         filename=version.file.name.replace(".enc", ""),
+    #     )
+    #     return response
 
     @action(
         detail=True,

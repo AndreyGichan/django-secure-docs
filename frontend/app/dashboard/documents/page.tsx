@@ -64,6 +64,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { ShareDocumentDialog } from "@/components/share-document-dialog"
+import { DownloadDocumentDialog } from "@/components/download-document-dialog"
 import { getDocuments } from "@/lib/api/documents";
 import { getCurrentUser, searchUsers } from "@/lib/api/auth"
 import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument, shareDocument } from "@/lib/api/documents"
@@ -82,31 +83,6 @@ interface Document {
   created_at: string
   updated_at: string
 }
-
-// interface Document {
-//   id: string
-//   title: string
-//   type: string
-//   size: string
-//   version: number
-//   owner: string
-//   sharedWith: number
-//   lastModified: string
-//   status: "active" | "archived" | "draft"
-// }
-
-// const documents: Document[] = [
-//   { id: "1", title: "Q4_Financial_Report_2025.pdf", type: "pdf", size: "2.4 MB", version: 5, owner: "Ivanov I.", sharedWith: 8, lastModified: "2 hours ago", status: "active" },
-//   { id: "2", title: "Budget_Forecast_2026.xlsx", type: "xlsx", size: "1.1 MB", version: 3, owner: "Petrova A.", sharedWith: 5, lastModified: "5 hours ago", status: "active" },
-//   { id: "3", title: "NDA_Template_v2.docx", type: "docx", size: "340 KB", version: 2, owner: "Sidorov K.", sharedWith: 12, lastModified: "1 day ago", status: "active" },
-//   { id: "4", title: "Product_Roadmap.pdf", type: "pdf", size: "5.7 MB", version: 8, owner: "Kozlova M.", sharedWith: 15, lastModified: "1 day ago", status: "active" },
-//   { id: "5", title: "Meeting_Notes_Jan.docx", type: "docx", size: "89 KB", version: 1, owner: "Novikov D.", sharedWith: 3, lastModified: "2 days ago", status: "draft" },
-//   { id: "6", title: "Architecture_Diagram.png", type: "png", size: "3.2 MB", version: 4, owner: "Ivanov I.", sharedWith: 10, lastModified: "3 days ago", status: "active" },
-//   { id: "7", title: "Security_Audit_2025.pdf", type: "pdf", size: "1.8 MB", version: 2, owner: "Petrova A.", sharedWith: 2, lastModified: "5 days ago", status: "archived" },
-//   { id: "8", title: "Employee_Handbook.pdf", type: "pdf", size: "4.5 MB", version: 12, owner: "Sidorov K.", sharedWith: 45, lastModified: "1 week ago", status: "active" },
-//   { id: "9", title: "API_Documentation.docx", type: "docx", size: "678 KB", version: 6, owner: "Kozlova M.", sharedWith: 8, lastModified: "1 week ago", status: "active" },
-//   { id: "10", title: "Invoice_Dec_2025.xlsx", type: "xlsx", size: "245 KB", version: 1, owner: "Novikov D.", sharedWith: 1, lastModified: "2 weeks ago", status: "archived" },
-// ]
 
 function getFileIcon(type: string) {
   switch (type) {
@@ -259,6 +235,8 @@ export default function DocumentsPage() {
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [shareDoc, setShareDoc] = useState<Document | null>(null)
+  const [downloadOpen, setDownloadOpen] = useState(false)
+  const [downloadDoc, setDownloadDoc] = useState<Document | null>(null)
 
   const hiddenFileInput = useRef<HTMLInputElement>(null)
 
@@ -951,21 +929,33 @@ export default function DocumentsPage() {
                           <Eye className="mr-2 h-3.5 w-3.5" />
                           Сведения
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs tracking-wide font-mono">
-                          <Download className="mr-2 h-3.5 w-3.5" />
-                          Скачать
-                        </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-xs tracking-wide font-mono"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setShareDoc(doc)
-                            setShareOpen(true)
+                            setDownloadDoc(doc)
+                            setDownloadOpen(true)
                           }}
                         >
-                          <Share2 className="mr-2 h-3.5 w-3.5" />
-                          Поделиться
+                          <Download className="mr-2 h-3.5 w-3.5" />
+                          Скачать
                         </DropdownMenuItem>
+
+                        {currentUser?.email === doc.owner_email && (
+                          <>
+                            <DropdownMenuItem
+                              className="text-xs tracking-wide font-mono"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setShareDoc(doc)
+                                setShareOpen(true)
+                              }}
+                            >
+                              <Share2 className="mr-2 h-3.5 w-3.5" />
+                              Поделиться
+                            </DropdownMenuItem>
+                          </>
+                        )}
                         <DropdownMenuItem
                           className="text-xs tracking-wide font-mono"
                           onClick={async (e) => {
@@ -977,18 +967,22 @@ export default function DocumentsPage() {
                           <Upload className="mr-2 h-3.5 w-3.5" />
                           Загрузить новую версию
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-border" />
-                        <DropdownMenuItem
-                          className="text-xs text-destructive tracking-wide font-mono"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDocToDelete(doc);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-3.5 w-3.5" />
-                          Удалить
-                        </DropdownMenuItem>
+                        {currentUser?.email === doc.owner_email && (
+                          <>
+                            <DropdownMenuSeparator className="bg-border" />
+                            <DropdownMenuItem
+                              className="text-xs text-destructive tracking-wide font-mono"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDocToDelete(doc);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" />
+                              Удалить
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -1047,6 +1041,17 @@ export default function DocumentsPage() {
             documentTitle={shareDoc.title}
             documentId={shareDoc.id}
             documentType={shareDoc.type}
+          />
+        )}
+
+        {/* Download Document Dialog */}
+        {downloadDoc && (
+          <DownloadDocumentDialog
+            open={downloadOpen}
+            onOpenChange={setDownloadOpen}
+            documentTitle={downloadDoc.title}
+            documentId={downloadDoc.id}
+            documentType={downloadDoc.type}
           />
         )}
 
@@ -1215,10 +1220,7 @@ export default function DocumentsPage() {
                     </div>
                   </span>
                 </div>
-                {/* <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Status</span>
-                  {getStatusBadge(selectedDoc.status)}
-                </div> */}
+
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground text-xs">Status</span>
 
@@ -1329,7 +1331,7 @@ export default function DocumentsPage() {
                         }}
                         className="h-8 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground text-xs border-0 hover:opacity-90"
                       >
-                        Save
+                        Сохранить
                       </Button>
 
                       <Button
@@ -1343,7 +1345,7 @@ export default function DocumentsPage() {
                         }}
                         className="h-8 text-xs"
                       >
-                        Cancel
+                        Отмена
                       </Button>
                     </div>
                   ) : (
@@ -1384,20 +1386,30 @@ export default function DocumentsPage() {
                 </div>
               </div>
               <DialogFooter className="flex gap-2">
+                {currentUser?.email === selectedDoc?.owner_email && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs tracking-wide font-mono"
+                    onClick={() => {
+                      setDetailOpen(false)
+                      setShareDoc(selectedDoc)
+                      setShareOpen(true)
+                    }}
+                  >
+                    <Share2 className="h-3 w-3" />
+                    Поделиться
+                  </Button>
+                )}
                 <Button
-                  variant="outline"
                   size="sm"
-                  className="bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs tracking-wide font-mono"
+                  className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 text-xs tracking-wide font-mono"
                   onClick={() => {
                     setDetailOpen(false)
-                    setShareDoc(selectedDoc)
-                    setShareOpen(true)
+                    setDownloadDoc(selectedDoc)
+                    setDownloadOpen(true)
                   }}
                 >
-                  <Share2 className="h-3 w-3" />
-                  Поделиться
-                </Button>
-                <Button size="sm" className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 text-xs tracking-wide font-mono">
                   <Download className="h-3 w-3" />
                   Скачать
                 </Button>

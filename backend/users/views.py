@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.filters import SearchFilter
+from rest_framework.decorators import action
 from .models import User
 from .serializers import UserProfileSerializer
 
@@ -66,6 +67,15 @@ class UserProfileView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['patch'], permission_classes=[IsAuthenticated])
+    def update_public_key(self, request):
+        public_key = request.data.get("public_key")
+        if not public_key:
+            return Response({"error": "public_key is required"}, status=status.HTTP_400_BAD_REQUEST)
+        request.user.public_key = public_key
+        request.user.save()
+        return Response({"public_key": public_key}, status=status.HTTP_200_OK)
 
 
 class UserSearchView(ListAPIView):
