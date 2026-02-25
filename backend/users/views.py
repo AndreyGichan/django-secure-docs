@@ -68,8 +68,8 @@ class UserProfileView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=False, methods=['patch'], permission_classes=[IsAuthenticated])
-    def update_public_key(self, request):
+    # @action(detail=False, methods=['patch'], permission_classes=[IsAuthenticated])
+    def patch(self, request):
         public_key = request.data.get("public_key")
         if not public_key:
             return Response({"error": "public_key is required"}, status=status.HTTP_400_BAD_REQUEST)

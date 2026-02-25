@@ -32,3 +32,6 @@ export const revokeDocumentAccess = (
     documentId: string,
     userId: string
 ) => API.post(`documents/${documentId}/revoke/${userId}/`);
+export const getMyEncryptedDEK = (documentId: string) => {
+    return API.get(`documents/${documentId}/my_dek/`);
+};

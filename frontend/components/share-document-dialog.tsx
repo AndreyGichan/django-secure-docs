@@ -15,6 +15,7 @@ import {
     Check,
     Share2,
     Trash2,
+    Plus,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -40,7 +41,8 @@ import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { searchUsers } from "@/lib/api/auth"
-import { shareDocument, getDocumentAccess, updateDocumentAccess, revokeDocumentAccess } from "@/lib/api/documents"
+import { shareDocument, getDocumentAccess, updateDocumentAccess, revokeDocumentAccess, getMyEncryptedDEK } from "@/lib/api/documents"
+import { importPrivateKey, importPublicKey, encryptDEKForUser, decryptDEK } from "@/lib/crypto/keys";
 
 interface User {
     id: string
@@ -49,6 +51,7 @@ interface User {
     department: string
     avatarInitials: string
     color: string
+    publicKey: string
 }
 
 interface AccessEntry {
@@ -98,8 +101,10 @@ export function ShareDocumentDialog({
     const [editComment, setEditComment] = useState("")
     const [revokeUser, setRevokeUser] = useState<AccessEntry | null>(null)
     const [revokeDialogOpen, setRevokeDialogOpen] = useState(false)
+    const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null);
 
     const dropdownRef = useRef<HTMLDivElement | null>(null)
+    const hiddenPrivateKeyInput = useRef<HTMLInputElement | null>(null);
 
     const currentAccessUserIds = currentAccess.map((a) => a.user.id)
     const selectedUserIds = selectedUsers.map((u) => u.id)
@@ -144,22 +149,45 @@ export function ShareDocumentDialog({
         if (selectedUsers.length === 0) return
 
         try {
-            await Promise.all(
-                selectedUsers.map((user) => {
-                    const data: {
-                        user_id: string
-                        role: "viewer" | "editor"
-                        comment?: string
-                        days?: number
-                    } = {
-                        user_id: user.id,
-                        role,
-                    }
-                    if (comment.trim()) data.comment = comment.trim()
-                    if (duration !== "unlimited") data.days = parseInt(duration)
-                    return shareDocument(documentId, data)
-                })
-            )
+            const resDek = await getMyEncryptedDEK(documentId);
+            const myDekEncrypted = Uint8Array.from(atob(resDek.data.encrypted_dek), c => c.charCodeAt(0));
+
+            if (!privateKeyFile) {
+                alert("Выберите приватный ключ .pem для расшифровки");
+                return;
+            }
+
+            const pemText = await privateKeyFile.text();
+            const privateKey = await importPrivateKey(pemText);
+
+            const myDek = await decryptDEK(myDekEncrypted, privateKey);
+
+            await Promise.all(selectedUsers.map(async (user) => {
+                if (!user.publicKey) {
+                    console.warn(`User ${user.name} has no public key, skipping`);
+                    return;
+                }
+                const publicKey = await importPublicKey(user.publicKey);
+                const encryptedDekForUser = await encryptDEKForUser(myDek, publicKey);
+                const encryptedDekBase64 = btoa(String.fromCharCode(...encryptedDekForUser));
+
+                const data: {
+                    user_id: string
+                    role: "viewer" | "editor"
+                    encrypted_dek: string
+                    comment?: string
+                    days?: number
+                } = {
+                    user_id: user.id,
+                    role,
+                    encrypted_dek: encryptedDekBase64
+                };
+                if (comment.trim()) data.comment = comment.trim();
+                if (duration !== "unlimited") data.days = parseInt(duration);
+
+                await shareDocument(documentId, data);
+            }));
+
 
             await loadAccess()
 
@@ -227,6 +255,7 @@ export function ShareDocumentDialog({
                             ? u.full_name.split(" ").map((s: string) => s[0]).join("").slice(0, 2).toUpperCase()
                             : "NA",
                         color: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+                        publicKey: u.public_key,
                     }))
                     setAllUsers(users)
                 })
@@ -545,6 +574,60 @@ export function ShareDocumentDialog({
                                     rows={2}
                                 />
                             </div>
+
+                            <div className="flex flex-col gap-2">
+                                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">
+                                    Private Key (.pem)
+                                </Label>
+
+                                <input
+                                    type="file"
+                                    accept=".pem"
+                                    ref={hiddenPrivateKeyInput}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0]
+                                        if (file) setPrivateKeyFile(file)
+                                    }}
+                                    className="hidden"
+                                />
+
+                                <div
+                                    onClick={() => hiddenPrivateKeyInput.current?.click()}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault()
+                                        const file = e.dataTransfer.files?.[0]
+                                        if (file) setPrivateKeyFile(file)
+                                    }}
+                                    className="flex h-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 transition-colors hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50"
+                                >
+                                    {privateKeyFile ? (
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-sm text-foreground truncate">{privateKeyFile.name}</span>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setPrivateKeyFile(null)
+                                                    if (hiddenPrivateKeyInput.current) hiddenPrivateKeyInput.current.value = ""
+                                                }}
+                                                className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-2">
+                                            <Plus className="h-8 w-8 text-muted-foreground" />
+                                            <span className="text-xs text-muted-foreground tracking-wide">
+                                                Перетащите файл .pem или кликните, чтобы выбрать
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
 
                             {/* Grant button */}
                             <Button

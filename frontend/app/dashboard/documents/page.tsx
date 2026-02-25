@@ -505,47 +505,17 @@ export default function DocumentsPage() {
 
       try {
         setUserSearchLoading(true);
-        const res = await searchUsers(userSearch); // API возвращает filtered users
+        const res = await searchUsers(userSearch); 
         setUserResults(res.data);
       } catch (error) {
         console.error("User search error", error);
       } finally {
         setUserSearchLoading(false);
       }
-    }, 500); // debounce 300ms
+    }, 500); 
 
     return () => clearTimeout(handler);
   }, [userSearch]);
-
-
-  const handleShare = async () => {
-    if (!selectedDoc || !shareUserId) {
-      alert("Выберите пользователя");
-      return;
-    }
-
-    try {
-      setShareLoading(true);
-
-      await shareDocument(selectedDoc.id, {
-        user_id: shareUserId,
-        role: shareRole,
-      });
-
-      setShareOpen(false);
-      setSelectedUser(null);
-      setUserSearch("");
-      setUserResults([]);
-      setShareRole("read");
-
-      await fetchDocuments();
-    } catch (error: any) {
-      console.error("Share error", error);
-      alert(error?.response?.data?.detail || "Ошибка при выдаче доступа");
-    } finally {
-      setShareLoading(false);
-    }
-  };
 
 
   return (
@@ -677,7 +647,7 @@ export default function DocumentsPage() {
                       className="bg-secondary/50 border-border text-foreground font-mono"
                     />
                   </div>
-                  <div className="flex flex-col gap-2">
+                  {/* <div className="flex flex-col gap-2">
                     <Label className="text-xs text-muted-foreground">Access</Label>
                     <Select>
                       <SelectTrigger className="bg-secondary/50 border-border text-foreground">
@@ -689,7 +659,7 @@ export default function DocumentsPage() {
                         <SelectItem value="public">All users</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
+                  </div> */}
                 </div>
                 <DialogFooter>
                   <Button

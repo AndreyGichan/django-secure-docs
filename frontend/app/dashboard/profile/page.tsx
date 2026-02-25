@@ -40,7 +40,7 @@ import {
     DialogDescription,
 } from "@/components/ui/dialog"
 import { updateUserPublicKey } from "@/lib/api/auth";
-import { generateKeyPair, toPEM } from "@/lib/keys";
+import { generateKeyPair, toPEM } from "@/lib/crypto/keys";
 
 
 const userProfile = {

@@ -14,7 +14,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { register, login as loginUser } from "@/lib/api/auth";
-import { generateKeyPair, toPEM } from "@/lib/keys";
+import { generateKeyPair, toPEM } from "@/lib/crypto/keys";
 
 
 export default function RegisterPage() {
@@ -384,7 +384,7 @@ export default function RegisterPage() {
                     <div className="mx-6 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/5 border border-amber-500/15 px-3 py-3">
                         <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-2" />
                         <p className="text-[12px] text-amber-400/80 leading-relaxed font-mono">
-                        При потере приватного ключа восстановить доступ к ранее загруженным документам будет невозможно. Храните его в безопасном месте.
+                            При потере приватного ключа восстановить доступ к ранее загруженным документам будет невозможно. Храните его в безопасном месте.
                         </p>
                     </div>
 
