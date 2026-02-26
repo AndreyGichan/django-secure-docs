@@ -1,3 +1,5 @@
+import * as fernet from "fernet";
+
 export const generateKeyPair = async () => {
     const keyPair = await window.crypto.subtle.generateKey(
         {
@@ -67,10 +69,30 @@ export const encryptDEKForUser = async (dek: Uint8Array, publicKey: CryptoKey) =
     ));
 };
 
-export const decryptDEK = async (encryptedDek: Uint8Array, privateKey: CryptoKey) => {
-    return new Uint8Array(await window.crypto.subtle.decrypt(
+
+export const decryptDEK = async (encryptedDek: Uint8Array, privateKey: CryptoKey): Promise<Uint8Array> => {
+    const decrypted = await window.crypto.subtle.decrypt(
         { name: "RSA-OAEP" },
         privateKey,
         encryptedDek.buffer as ArrayBuffer
-    ));
+    );
+
+    const dekBytes = new Uint8Array(decrypted);
+
+    if (dekBytes.length !== 32) {
+        throw new Error(`DEK должен быть 32 байта, но получил ${dekBytes.length}`);
+    }
+
+    return dekBytes;
+};
+
+export const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
+    }
+    return btoa(binary);
 };

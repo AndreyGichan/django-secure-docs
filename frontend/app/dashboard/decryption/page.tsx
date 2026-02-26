@@ -87,6 +87,7 @@ export default function DecryptionPage() {
       />
 
       <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-6xl mx-auto flex flex-col gap-6">
         {/* Security banner */}
         <div className="relative mb-6 overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-600/10 via-teal-600/5 to-cyan-500/10 p-5">
           <div className="absolute top-0 right-0 h-full w-1/3 bg-gradient-to-l from-emerald-500/10 to-transparent" />
@@ -98,22 +99,21 @@ export default function DecryptionPage() {
             </div>
             <div className="flex-1">
               <h3 className="text-sm font-semibold text-foreground">Local Browser Decryption</h3>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-xl">
-                All decryption is performed entirely in your browser. Your private key never leaves your device
-                and is not transmitted to the server. Files are processed locally using the Web Crypto API.
+              <p className="text-xs font-mono text-muted-foreground mt-1 leading-relaxed max-w-lg">
+                Вся расшифровка выполняется полностью в вашем браузере. Ваш приватный ключ никогда не покидает ваше устройство и не передаётся на сервер.
               </p>
               <div className="flex items-center gap-4 mt-3">
                 <div className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[10px] text-emerald-400/80 font-medium">End-to-End Encrypted</span>
+                  <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[11px] text-emerald-400/80 font-medium">End-to-End Encrypted</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <HardDrive className="h-3 w-3 text-emerald-400/60" />
-                  <span className="text-[10px] text-emerald-400/80 font-medium">Client-Side Only</span>
+                  <HardDrive className="h-4 w-4 text-emerald-400/60" />
+                  <span className="text-[11px] text-emerald-400/80 font-medium">Client-Side Decryption</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Lock className="h-3 w-3 text-emerald-400/60" />
-                  <span className="text-[10px] text-emerald-400/80 font-medium">Zero-Knowledge</span>
+                  <Lock className="h-4 w-4 text-emerald-400/60" />
+                  <span className="text-[11px] text-emerald-400/80 font-medium">Zero-Knowledge</span>
                 </div>
               </div>
             </div>
@@ -128,17 +128,17 @@ export default function DecryptionPage() {
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/30 to-transparent" />
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/15">
-                    <span className="text-[10px] font-bold text-violet-400">1</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/15">
+                    <span className="text-[12px] font-bold text-violet-400">1</span>
                   </div>
                   <div>
-                    <h3 className="text-xs font-semibold text-foreground">Select Encrypted File</h3>
-                    <p className="text-[10px] text-muted-foreground">Upload the encrypted document for decryption</p>
+                    <h3 className="text-sm font-normal tracking-wide text-foreground">Выберите зашифрованный файл</h3>
+                    <p className="text-xs font-mono text-muted-foreground mt-0.5">Загрузите зашифрованный документ для расшифровки</p>
                   </div>
                   {encryptedFile && (
-                    <Badge variant="outline" className="ml-auto bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-mono">
-                      <CheckCircle2 className="mr-1 h-2.5 w-2.5" />
-                      Ready
+                    <Badge variant="outline" className="ml-auto bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px] tracking-wide">
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      Готово
                     </Badge>
                   )}
                 </div>
@@ -163,11 +163,11 @@ export default function DecryptionPage() {
                         <Upload className="h-6 w-6 text-muted-foreground/60 group-hover:text-violet-400 transition-colors duration-300" />
                       </div>
                       <div className="flex flex-col items-center gap-1">
-                        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                          Drop encrypted file here or click to browse
+                        <span className="text-xs font-medium font-mono text-muted-foreground group-hover:text-foreground transition-colors">
+                          Перетащите зашифрованный файл или нажмите для выбора
                         </span>
-                        <span className="text-[10px] text-muted-foreground/50">
-                          Any encrypted file type
+                        <span className="text-[11px] font-mono text-muted-foreground/50">
+                          Любой тип зашифрованного файла
                         </span>
                       </div>
                     </label>
@@ -201,17 +201,17 @@ export default function DecryptionPage() {
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/15">
-                    <span className="text-[10px] font-bold text-cyan-400">2</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/15">
+                    <span className="text-[12px] font-bold text-cyan-400">2</span>
                   </div>
                   <div>
-                    <h3 className="text-xs font-semibold text-foreground">Select Private Key</h3>
-                    <p className="text-[10px] text-muted-foreground">Attach your private key for decryption</p>
+                    <h3 className="text-sm font-normal tracking-wide text-foreground">Выберите приватный ключ</h3>
+                    <p className="text-[12px] font-mono text-muted-foreground mt-0.5">Прикрепите ваш приватный ключ для расшифровки</p>
                   </div>
                   {privateKeyFile && (
-                    <Badge variant="outline" className="ml-auto bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-mono">
-                      <CheckCircle2 className="mr-1 h-2.5 w-2.5" />
-                      Ready
+                    <Badge variant="outline" className="ml-auto bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px] tracking-wide ">
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      Готово
                     </Badge>
                   )}
                 </div>
@@ -237,11 +237,11 @@ export default function DecryptionPage() {
                         <KeyRound className="h-6 w-6 text-muted-foreground/60 group-hover:text-cyan-400 transition-colors duration-300" />
                       </div>
                       <div className="flex flex-col items-center gap-1">
-                        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                          Drop private key file here or click to browse
+                        <span className="text-xs font-medium font-mono text-muted-foreground group-hover:text-foreground transition-colors">
+                          Перетащите файл приватного ключа или нажмите для выбора
                         </span>
-                        <span className="text-[10px] text-muted-foreground/50">
-                          .pem, .key, .p8, .der
+                        <span className="text-[11px] text-muted-foreground/50">
+                          .pem
                         </span>
                       </div>
                     </label>
@@ -287,19 +287,19 @@ export default function DecryptionPage() {
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-500/20 border border-emerald-500/15">
-                    <span className="text-[10px] font-bold text-emerald-400">3</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-500/20 border border-emerald-500/15">
+                    <span className="text-[12px] font-bold text-emerald-400">3</span>
                   </div>
                   <div>
-                    <h3 className="text-xs font-semibold text-foreground">Decrypt File</h3>
-                    <p className="text-[10px] text-muted-foreground">Start the decryption process</p>
+                    <h3 className="text-sm font-normal tracking-wide text-foreground">Расшифровать файл</h3>
+                    <p className="text-[12px] font-mono text-muted-foreground mt-0.5">Запустить процесс расшифровки</p>
                   </div>
                 </div>
 
                 {state === "decrypting" && (
                   <div className="mb-4">
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-2">
-                      <span>Decrypting...</span>
+                      <span>Расшифровка...</span>
                       <span className="font-mono text-foreground">{Math.min(100, Math.round(progress))}%</span>
                     </div>
                     <Progress value={Math.min(100, progress)} className="h-2 bg-secondary" />
@@ -310,8 +310,8 @@ export default function DecryptionPage() {
                   <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 px-4 py-3">
                     <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
                     <div className="flex flex-col">
-                      <span className="text-xs font-medium text-emerald-400">Decryption complete</span>
-                      <span className="text-[10px] text-emerald-400/60">The decrypted file has been saved to your device</span>
+                      <span className="text-xs font-medium font-mono text-emerald-400">Расшифровка завершена</span>
+                      <span className="text-[10px] font-mono text-emerald-400/60">Расшифрованный файл сохранен на ваше устройство</span>
                     </div>
                   </div>
                 )}
@@ -320,8 +320,8 @@ export default function DecryptionPage() {
                   <div className="mb-4 flex items-center gap-3 rounded-xl bg-rose-500/5 border border-rose-500/20 px-4 py-3">
                     <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0" />
                     <div className="flex flex-col">
-                      <span className="text-xs font-medium text-rose-400">Decryption failed</span>
-                      <span className="text-[10px] text-rose-400/60">Invalid private key or corrupted file</span>
+                      <span className="text-xs font-medium font-mono text-rose-400">Ошибка расшифровки</span>
+                      <span className="text-[10px] font-mono text-rose-400/60">Неверный приватный ключ или поврежденный файл</span>
                     </div>
                   </div>
                 )}
@@ -331,19 +331,19 @@ export default function DecryptionPage() {
                     <>
                       <Button
                         size="sm"
-                        className="flex-1 h-10 bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:opacity-90 border-0 text-xs font-medium"
+                        className="flex-1 h-10 bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:opacity-90 border-0 text-xs font-medium font-mono"
                       >
-                        <Download className="mr-2 h-3.5 w-3.5" />
-                        Save Decrypted File
+                        <Download className="h-3.5 w-3.5" />
+                        Сохранить рассшифрованный файл
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs"
+                        className="h-10 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs font-mono"
                         onClick={handleReset}
                       >
                         <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                        New File
+                        Новый файл
                       </Button>
                     </>
                   ) : (
@@ -356,12 +356,12 @@ export default function DecryptionPage() {
                       {state === "decrypting" ? (
                         <span className="flex items-center gap-2">
                           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                          Decrypting...
+                          Расшифровка файла...
                         </span>
                       ) : (
-                        <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 font-mono">
                           <Unlock className="h-3.5 w-3.5" />
-                          Decrypt File
+                          Расшифровать файл
                         </span>
                       )}
                     </Button>
@@ -370,9 +370,9 @@ export default function DecryptionPage() {
 
                 {!isReady && state === "idle" && (
                   <div className="flex items-start gap-2 mt-3 rounded-lg bg-amber-500/5 border border-amber-500/10 px-3 py-2">
-                    <Info className="h-3 w-3 shrink-0 text-amber-400/60 mt-0.5" />
-                    <span className="text-[10px] text-amber-400/60 leading-relaxed">
-                      Select both the encrypted file and your private key to proceed with decryption.
+                    <Info className="h-4 w-4 shrink-0 text-amber-400/60" />
+                    <span className="text-[11px] tracking-wide text-amber-400/60 leading-relaxed">
+                      Выберите зашифрованный файл и приватный ключ для продолжения расшифровки.
                     </span>
                   </div>
                 )}
@@ -386,25 +386,25 @@ export default function DecryptionPage() {
             <div className="relative rounded-2xl border border-border/50 bg-card overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/20 to-transparent" />
               <div className="p-5">
-                <h3 className="text-xs font-semibold text-foreground mb-4">How it Works</h3>
+                <h3 className="text-xs font-normal font-mono text-foreground mb-4">Как это работает</h3>
                 <div className="flex flex-col gap-3">
                   {[
                     {
                       step: "1",
-                      title: "Select encrypted file",
-                      desc: "Choose the file downloaded from the system in encrypted form",
+                      title: "Выберите зашифрованный файл",
+                      desc: "Выберите файл, загруженный из системы в зашифрованном виде",
                       color: "from-violet-500/20 to-purple-500/20 border-violet-500/15 text-violet-400",
                     },
                     {
                       step: "2",
-                      title: "Attach private key",
-                      desc: "Upload your private key file that was used to encrypt the document",
+                      title: "Прикрепите приватный ключ",
+                      desc: "Загрузите файл приватного ключа, который использовался для шифрования документа",
                       color: "from-cyan-500/20 to-teal-500/20 border-cyan-500/15 text-cyan-400",
                     },
                     {
                       step: "3",
-                      title: "Decrypt",
-                      desc: "Click decrypt and save the resulting file to your device",
+                      title: "Расшифруйте",
+                      desc: "Нажмите расшифровать и сохраните полученный файл на устройство",
                       color: "from-emerald-500/20 to-green-500/20 border-emerald-500/15 text-emerald-400",
                     },
                   ].map((item) => (
@@ -413,8 +413,8 @@ export default function DecryptionPage() {
                         <span className="text-[9px] font-bold">{item.step}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[11px] font-medium text-foreground">{item.title}</span>
-                        <span className="text-[10px] text-muted-foreground leading-relaxed">{item.desc}</span>
+                        <span className="text-[11px] font-mono font-medium text-foreground tracking-wide ">{item.title}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground leading-relaxed tracking-wide ">{item.desc}</span>
                       </div>
                     </div>
                   ))}
@@ -423,7 +423,7 @@ export default function DecryptionPage() {
             </div>
 
             {/* Supported Formats */}
-            <div className="relative rounded-2xl border border-border/50 bg-card overflow-hidden">
+            {/* <div className="relative rounded-2xl border border-border/50 bg-card overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
               <div className="p-5">
                 <h3 className="text-xs font-semibold text-foreground mb-3">Supported Key Formats</h3>
@@ -458,31 +458,32 @@ export default function DecryptionPage() {
                   ))}
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* Security Info */}
             <div className="relative rounded-2xl border border-emerald-500/15 bg-emerald-500/5 overflow-hidden">
               <div className="p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                  <h3 className="text-xs font-semibold text-emerald-400">Security Guarantee</h3>
+                  <h3 className="text-xs font-semibold text-emerald-400 font-mono tracking-wide">Гарантия безопасности</h3>
                 </div>
                 <div className="flex flex-col gap-2.5">
                   {[
-                    "Your private key never leaves the browser",
-                    "No data is transmitted to the server during decryption",
-                    "Files are processed using the Web Crypto API",
-                    "Memory is cleared after the operation completes",
+                    "Ваш приватный ключ никогда не покидает браузер",
+                    "Во время расшифровки данные не передаются на сервер",
+                    "Файлы обрабатываются с использованием Web Crypto API",
+                    "Память очищается после завершения операции",
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-2">
-                      <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400/60 mt-0.5" />
-                      <span className="text-[10px] text-emerald-400/70 leading-relaxed">{item}</span>
+                      <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400/60" />
+                      <span className="text-[10px] text-emerald-400/70 font-mono leading-relaxed">{item}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

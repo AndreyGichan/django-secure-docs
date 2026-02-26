@@ -110,6 +110,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             # file_bytes = file.read()
             # encrypted_bytes = encrypt_file(file_bytes, dek)
             # encrypted_file = ContentFile(encrypted_bytes, name=file.name + ".enc")
+            
 
             last_version = document.versions.order_by("-version_number").first()
             new_version_number = last_version.version_number + 1 if last_version else 1
@@ -270,12 +271,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
     )
     def my_dek(self, request, pk=None):
         document = self.get_object()
-
         access = DocumentAccess.objects.get(document=document, user=request.user)
+        encrypted_dek_b64 = base64.b64encode(access.encrypted_dek).decode("utf-8")
 
-        encoded_dek = base64.b64encode(access.encrypted_dek).decode("utf-8")
-
-        return Response({"encrypted_dek": encoded_dek})
+        return Response({"encrypted_dek": encrypted_dek_b64})
 
     # @action(
     #     detail=True,
