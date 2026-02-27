@@ -115,17 +115,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
             last_version = document.versions.order_by("-version_number").first()
             new_version_number = last_version.version_number + 1 if last_version else 1
 
+            version_status = "approved" if user == document.owner else "pending"
+
             DocumentVersion.objects.create(
                 document=document,
                 # file=encrypted_file,
                 file=file,
                 version_number=new_version_number,
                 uploaded_by=user,
-                status="pending",
+                status=version_status,
             )
 
-            document.status = "draft"
-            document.save()
+            last_access = DocumentAccess.objects.get(document=document, user=user)
+            last_access.last_access = timezone.now()
+            last_access.save()
 
             log_action(
                 user=user,
@@ -137,7 +140,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
                         last_version.version_number if last_version else None
                     )
                 },
-                new_data={"new_version": new_version_number},
+                new_data={"new_version": new_version_number, "status": version_status},
                 ip_address=get_client_ip(request),
             )
 
@@ -150,17 +153,29 @@ class DocumentViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsAuthenticated, IsOwnerOrHasAccess],
+        permission_classes=[IsAuthenticated],
     )
     def approve_version(self, request, pk=None):
+        document = self.get_object()
+
+        if document.owner != request.user:
+            return Response(
+                {"detail": "Only owner can approve version."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         version_id = request.data.get("version_id")
         version = get_object_or_404(DocumentVersion, id=version_id, document_id=pk)
+
+        if version.status != "pending":
+            return Response(
+                {"detail": "Only pending versions can be approved."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         old_status = version.status
         version.status = "approved"
         version.save()
-        version.document.status = "active"
-        version.document.save()
 
         log_action(
             user=request.user,
@@ -217,7 +232,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
     )
     def create_download_link(self, request, pk=None):
         document = self.get_object()
-        version = document.versions.first()
+        # version = document.versions.first()
+
+        version_id = request.data.get("version_id")  
+        if version_id:
+            version = get_object_or_404(DocumentVersion, id=version_id, document=document)
+        else:
+            version = document.versions.filter(status="approved").order_by("-version_number").first()
+            if not version:
+                return Response({"detail": "No approved version available."}, status=400)
 
         expires_at = timezone.now() + timedelta(hours=1)
 
@@ -273,6 +296,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document = self.get_object()
         access = DocumentAccess.objects.get(document=document, user=request.user)
         encrypted_dek_b64 = base64.b64encode(access.encrypted_dek).decode("utf-8")
+        # version_id = request.query_params.get("version_id")
+        # if version_id:
+        #     version = get_object_or_404(DocumentVersion, id=version_id, document=document)
+        #     access = DocumentAccess.objects.get(document=document, user=request.user, document_version=version)
+        # else:
+        #     access = DocumentAccess.objects.get(document=document, user=request.user)
+        # encrypted_dek_b64 = base64.b64encode(access.encrypted_dek).decode("utf-8")
+        # return Response({"encrypted_dek": encrypted_dek_b64})
 
         return Response({"encrypted_dek": encrypted_dek_b64})
 

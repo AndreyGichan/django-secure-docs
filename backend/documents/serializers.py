@@ -46,12 +46,11 @@ class DocumentSerializer(serializers.ModelSerializer):
         read_only_fields = ["owner", "type", "size", "shared_with", "version"]
 
     def get_shared_with(self, obj):
-        return (
-            obj.access_list.exclude(user=obj.owner)
-            .filter(revoked_at__isnull=True)
-            .filter(Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now()))
-            .count()
+        approved_version = (
+            obj.versions.filter(status="approved").order_by("-version_number").first()
         )
+
+        return approved_version.version_number if approved_version else None
 
     def get_version(self, obj):
         latest_version = obj.versions.order_by("-version_number").first()
@@ -201,7 +200,7 @@ class ShareDocumentSerializer(serializers.Serializer):
                 "role": validated_data["role"],
                 "encrypted_dek": encrypted_dek,
                 "expires_at": expires_at,
-                'comment': comment,
+                "comment": comment,
             },
         )
 

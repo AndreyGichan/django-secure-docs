@@ -1,6 +1,5 @@
 import { API } from "./index";
 import { decryptDEK, importPrivateKey, } from "@/lib/crypto/keys";
-import * as fernet from "fernet";
 
 interface GetDocumentsParams {
     search?: string;
@@ -18,6 +17,15 @@ export const createDocument = (data: FormData) => API.post("documents/", data);
 export const updateDocument = (id: string, data: any) => API.patch(`documents/${id}/`, data);
 export const deleteDocument = (id: string) => API.delete(`documents/${id}/`);
 export const uploadDocumentVersion = (documentId: string, data: FormData) => API.post(`documents/${documentId}/upload_version/`, data);
+export const getDocumentVersions = (documentId: string) =>
+    API.get(`documents/${documentId}/versions/`);
+export const approveDocumentVersion = (
+    documentId: string,
+    versionId: number
+) =>
+    API.post(`documents/${documentId}/approve_version/`, {
+        version_id: versionId,
+    });
 export const shareDocument = (documentId: string, data: {
     user_id: string;
     role: string;
@@ -70,7 +78,7 @@ export const downloadDecrypted = async (
     const pem = await privateKeyFile.text();
     const privateKey = await importPrivateKey(pem);
 
-    const { data: dekResponse } = await API.get(`documents/${documentId}/my_dek/`);
+    const { data: dekResponse } = await getMyEncryptedDEK(documentId)
     const encryptedDek = Uint8Array.from(atob(dekResponse.encrypted_dek), c => c.charCodeAt(0));
     const dekBytes = await decryptDEK(encryptedDek, privateKey);
 

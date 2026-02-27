@@ -1,5 +1,3 @@
-import * as fernet from "fernet";
-
 export const generateKeyPair = async () => {
     const keyPair = await window.crypto.subtle.generateKey(
         {

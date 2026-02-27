@@ -23,6 +23,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Pencil,
+  FileKey,
+  KeyRound,
 } from "lucide-react"
 
 import { PageHeader } from "@/components/page-header"
@@ -67,7 +69,8 @@ import { ShareDocumentDialog } from "@/components/share-document-dialog"
 import { DownloadDocumentDialog } from "@/components/download-document-dialog"
 import { getDocuments } from "@/lib/api/documents";
 import { getCurrentUser, searchUsers } from "@/lib/api/auth"
-import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument, shareDocument } from "@/lib/api/documents"
+import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument, approveDocumentVersion, getDocumentVersions, getMyEncryptedDEK} from "@/lib/api/documents"
+import { decryptDEK, importPrivateKey, } from "@/lib/crypto/keys";
 
 interface Document {
   id: string
@@ -82,6 +85,13 @@ interface Document {
   status: "active" | "archived" | "draft"
   created_at: string
   updated_at: string
+}
+
+interface DocumentVersion {
+  id: number
+  version_number: number
+  status: "approved" | "pending"
+  uploaded_at: string
 }
 
 function getFileIcon(type: string) {
@@ -164,6 +174,34 @@ function getStatusBadge(status: string, isSelected = false, compact = false) {
   }
 }
 
+function getVersionStatusBadge(status: string) {
+  const base =
+    "text-[10px] font-mono rounded-xl tracking-wide inline-flex items-center gap-1 px-2 py-0.5"
+
+  switch (status) {
+    case "approved":
+      return (
+        <Badge
+          variant="outline"
+          className={`${base} bg-emerald-500/15 text-emerald-400 border-emerald-500/30`}
+        >
+          ✔ Одобрено
+        </Badge>
+      )
+    case "pending":
+      return (
+        <Badge
+          variant="outline"
+          className={`${base} bg-amber-500/15 text-amber-400 border-amber-500/30`}
+        >
+          ⏳ В ожидании
+        </Badge>
+      )
+    default:
+      return null
+  }
+}
+
 function formatOwnerName(fullName: string) {
   if (!fullName) return ""
 
@@ -237,9 +275,12 @@ export default function DocumentsPage() {
   const [shareDoc, setShareDoc] = useState<Document | null>(null)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [downloadDoc, setDownloadDoc] = useState<Document | null>(null)
+  const [versions, setVersions] = useState<DocumentVersion[]>([])
+  const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null)
+  
 
   const hiddenFileInput = useRef<HTMLInputElement>(null)
-
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     async function fetchCurrentUser() {
@@ -444,29 +485,6 @@ export default function DocumentsPage() {
   };
 
 
-  const handleUploadVersion = async () => {
-    if (!uploadFileVersion || !selectedDoc) return;
-
-    try {
-      setUploadLoadingVersion(true);
-
-      const formData = new FormData();
-      formData.append("file", uploadFileVersion);
-
-      await uploadDocumentVersion(selectedDoc.id, formData);
-
-      setUploadVersionOpen(false);
-      setUploadFileVersion(null);
-
-      await fetchDocuments();
-    } catch (error) {
-      console.error("Failed to upload new version", error);
-    } finally {
-      setUploadLoadingVersion(false);
-    }
-  };
-
-
   const getDaysWord = (days: number) => {
     if (days % 10 === 1 && days % 100 !== 11) return "день";
     if ([2, 3, 4].includes(days % 10) && ![12, 13, 14].includes(days % 100))
@@ -505,18 +523,115 @@ export default function DocumentsPage() {
 
       try {
         setUserSearchLoading(true);
-        const res = await searchUsers(userSearch); 
+        const res = await searchUsers(userSearch);
         setUserResults(res.data);
       } catch (error) {
         console.error("User search error", error);
       } finally {
         setUserSearchLoading(false);
       }
-    }, 500); 
+    }, 500);
 
     return () => clearTimeout(handler);
   }, [userSearch]);
 
+  useEffect(() => {
+    if (!selectedDoc) return
+
+    const documentId = selectedDoc.id;
+
+    async function fetchVersions() {
+      try {
+        const res = await getDocumentVersions(documentId)
+        setVersions(res.data)
+      } catch (error) {
+        console.error("Failed to fetch versions", error)
+      }
+    }
+
+    fetchVersions()
+  }, [selectedDoc])
+
+
+  const handleApproveVersion = async (versionId: number) => {
+    if (!selectedDoc) return
+
+    try {
+      await approveDocumentVersion(selectedDoc.id, versionId)
+
+      const res = await getDocumentVersions(selectedDoc.id)
+      setVersions(res.data)
+
+      await fetchDocuments()
+    } catch (error) {
+      console.error("Failed to approve version", error)
+    }
+  }
+
+  const getVersionLabel = (v: DocumentVersion, isCurrent: boolean) => {
+    if (isCurrent) return "текущая";
+
+    const date = new Date(v.uploaded_at);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "сегодня";
+    if (diffDays < 7) return `${diffDays} ${getDaysWord(diffDays)} назад`;
+
+    return date.toLocaleDateString("ru-RU");
+  };
+
+  const handleEncryptAndUploadVersion = async () => {
+    if (!uploadFileVersion || !privateKeyFile || !selectedDoc) return;
+
+    setUploadLoadingVersion(true);
+
+    try {
+      const pem = await privateKeyFile.text();
+      const privateKey = await importPrivateKey(pem);
+
+      const { data: dekResponse } = await getMyEncryptedDEK(selectedDoc.id);
+      const encryptedDek = Uint8Array.from(atob(dekResponse.encrypted_dek), c => c.charCodeAt(0));
+      const dekBytes = await decryptDEK(encryptedDek, privateKey);
+
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const cryptoKey = await window.crypto.subtle.importKey(
+        "raw",
+        new Uint8Array(dekBytes),
+        "AES-GCM",
+        false,
+        ["encrypt"]
+      );
+
+      const fileBuffer = await uploadFileVersion.arrayBuffer();
+      const encryptedBuffer = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        cryptoKey,
+        fileBuffer
+      );
+
+      const combined = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(encryptedBuffer), iv.length);
+
+      const formData = new FormData();
+      formData.append("file", new Blob([combined]), uploadFileVersion.name);
+
+      await uploadDocumentVersion(selectedDoc.id, formData);
+
+      setUploadVersionOpen(false);
+      setUploadFileVersion(null);
+      setPrivateKeyFile(null);
+
+      await fetchDocuments();
+    } catch (err) {
+      console.error(err);
+      alert("Не удалось зашифровать и загрузить файл");
+    } finally {
+      setUploadLoadingVersion(false);
+    }
+  };
 
   return (
     <div className="flex flex-1 flex-col">
@@ -1134,6 +1249,69 @@ export default function DocumentsPage() {
             </div>
           </div>
 
+          <div>
+            {!privateKeyFile ? (
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) setPrivateKeyFile(file);
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pem,.key,.p8,.der"
+                  onChange={(e) => setPrivateKeyFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                  id="private-key-input-version"
+                />
+                <label
+                  htmlFor="private-key-input-version"
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-border/60 bg-card/50 px-3 py-3 transition-all duration-200 hover:border-violet-500/30 hover:bg-secondary/30 group"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/60 border border-border/50 group-hover:border-violet-500/20 transition-colors">
+                    <KeyRound className="h-4 w-4 text-muted-foreground group-hover:text-violet-400 transition-colors" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[12px] font-medium tracking-wide text-muted-foreground group-hover:text-foreground transition-colors">
+                      Прикрепить приватный ключ
+                    </span>
+                    <span className="text-[11px] text-muted-foreground/60">
+                      .pem
+                    </span>
+                  </div>
+                  <Upload className="ml-auto h-4 w-4 text-muted-foreground/40 group-hover:text-violet-400/60 transition-colors" />
+                </label>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-3 py-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/15">
+                  <FileKey className="h-4 w-4 text-emerald-400" />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-[12px] font-medium text-emerald-400 truncate">
+                    {privateKeyFile.name}
+                  </span>
+                  <span className="text-[10px] text-emerald-400/50 font-mono">
+                    {(privateKeyFile.size / 1024).toFixed(1)} KB
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setPrivateKeyFile(null)
+                    if (fileInputRef.current) fileInputRef.current.value = ""
+                  }}
+                  className="p-1 rounded-md hover:bg-secondary/50 transition-colors"
+                >
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                </button>
+              </div>
+            )}
+          </div>
+
+
           <DialogFooter>
             <Button
               variant="ghost"
@@ -1146,8 +1324,8 @@ export default function DocumentsPage() {
               Отмена
             </Button>
             <Button
-              onClick={handleUploadVersion}
-              disabled={!uploadFileVersion || uploadLoadingVersion}
+              onClick={handleEncryptAndUploadVersion}
+              disabled={!uploadFileVersion || !privateKeyFile || uploadLoadingVersion}
               className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 tracking-wide font-mono"
             >
               {uploadLoadingVersion ? "Загрузка..." : "Загрузить"}
@@ -1342,16 +1520,45 @@ export default function DocumentsPage() {
                   </div>
 
                   <div className="mt-2 flex flex-col gap-1.5">
-                    {Array.from({ length: Math.min(selectedDoc.version, 3) }, (_, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-md bg-secondary/30 px-3 py-2 text-xs">
-                        <span className="font-mono text-foreground">v{selectedDoc.version - i}</span>
-                        <span className="text-muted-foreground tracking-wide font-mono">
-                          {i === 0
-                            ? "Текущая"
-                            : `${i * 3} ${getDaysWord(i * 3)} назад`}
-                        </span>
-                      </div>
-                    ))}
+                    {(() => {
+                      const lastApprovedVersion = versions
+                        .filter(v => v.status === "approved")
+                        .sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0];
+
+                      return versions.map((v) => {
+                        const isCurrent = v.id === lastApprovedVersion?.id;
+
+                        return (
+                          <div
+                            key={v.id}
+                            className="flex items-center justify-between rounded-md bg-secondary/30 px-3 py-2 text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-foreground">v{v.version_number}</span>
+                              <span className="text-muted-foreground tracking-wide font-mono px-1">
+                                {getVersionLabel(v, isCurrent)}
+                              </span>
+
+                            </div>
+                            <div className="flex items-center gap-2">
+
+
+                              {getVersionStatusBadge(v.status)}
+                              {v.status === "pending" && currentUser?.email === selectedDoc?.owner_email && (
+                                <button
+                                  onClick={() => handleApproveVersion(v.id)}
+                                  className="text-[10px] font-mono rounded-sm tracking-wide inline-flex items-center gap-1 px-2 py-0.5 cursor-pointer bg-emerald-500/15 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-500/20"
+                                >
+                                  Одобрить
+                                </button>
+                              )}
+
+
+                            </div>
+                          </div>
+                        )
+                      })
+                    })()}
                   </div>
                 </div>
               </div>

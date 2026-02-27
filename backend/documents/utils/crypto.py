@@ -9,17 +9,13 @@ def generate_dek() -> bytes:
     return os.urandom(32)
 
 def encrypt_file(file_bytes: bytes, dek: bytes) -> bytes:
-    # f = Fernet(dek)
-    # return f.encrypt(file_bytes)
-    nonce = os.urandom(12)  # стандартно 12 байт для GCM
+    nonce = os.urandom(12)  
     cipher = Cipher(algorithms.AES(dek), modes.GCM(nonce), backend=default_backend())
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(file_bytes) + encryptor.finalize()
     return nonce + encryptor.tag + ciphertext
 
 def decrypt_file(encrypted_bytes: bytes, dek: bytes) -> bytes:
-    # f = Fernet(dek)
-    # return f.decrypt(encrypted_bytes)
     nonce = encrypted_bytes[:12]
     tag = encrypted_bytes[12:28]
     ciphertext = encrypted_bytes[28:]
