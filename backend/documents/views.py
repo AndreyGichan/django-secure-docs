@@ -10,8 +10,7 @@ from datetime import timedelta
 from django.db import models
 from django.http import FileResponse
 from django.core.files.base import ContentFile
-from io import BytesIO
-from django.db.models import Count, Subquery, OuterRef, Q, F, IntegerField
+from django.db.models import Q
 
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 from .serializers import (
@@ -23,12 +22,12 @@ from .serializers import (
     DownloadLinkSerializer,
 )
 from .permissions import IsOwnerOrHasAccess, CanEditDocument
-# from .utils.crypto import encrypt_file, decrypt_dek_for_user, decrypt_file
 from audit.utils.audit import log_action
 from config.constants import AuditAction
 from audit.utils.request import get_client_ip
 from .utils.filter import DocumentFilter
 from .utils.pagination import DocumentLimitOffsetPagination
+from .utils.file_format import build_encrypted_file_with_header
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -104,13 +103,16 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             file = serializer.validated_data["file"]
 
-            # access = DocumentAccess.objects.get(document=document, user=user)
-            # dek = decrypt_dek_for_user(access.encrypted_dek, user.private_key.encode())
+            encrypted_file_name = f"{file.name}.enc"
 
-            # file_bytes = file.read()
-            # encrypted_bytes = encrypt_file(file_bytes, dek)
-            # encrypted_file = ContentFile(encrypted_bytes, name=file.name + ".enc")
-            
+            original_bytes = file.read()
+
+            final_bytes = build_encrypted_file_with_header(
+                original_bytes,
+                document.id
+            )
+
+            encrypted_file = ContentFile(final_bytes, name=encrypted_file_name)
 
             last_version = document.versions.order_by("-version_number").first()
             new_version_number = last_version.version_number + 1 if last_version else 1
@@ -119,8 +121,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
             DocumentVersion.objects.create(
                 document=document,
-                # file=encrypted_file,
-                file=file,
+                file=encrypted_file,
                 version_number=new_version_number,
                 uploaded_by=user,
                 status=version_status,

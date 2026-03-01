@@ -69,8 +69,8 @@ import { ShareDocumentDialog } from "@/components/share-document-dialog"
 import { DownloadDocumentDialog } from "@/components/download-document-dialog"
 import { getDocuments } from "@/lib/api/documents";
 import { getCurrentUser, searchUsers } from "@/lib/api/auth"
-import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument, approveDocumentVersion, getDocumentVersions, getMyEncryptedDEK} from "@/lib/api/documents"
-import { decryptDEK, importPrivateKey, } from "@/lib/crypto/keys";
+import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument, approveDocumentVersion, getDocumentVersions, getMyEncryptedDEK } from "@/lib/api/documents"
+import { decryptDEK, importPrivateKey, importPublicKey, encryptDEKForUser, arrayBufferToBase64 } from "@/lib/crypto/keys";
 
 interface Document {
   id: string
@@ -277,7 +277,7 @@ export default function DocumentsPage() {
   const [downloadDoc, setDownloadDoc] = useState<Document | null>(null)
   const [versions, setVersions] = useState<DocumentVersion[]>([])
   const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null)
-  
+
 
   const hiddenFileInput = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -425,7 +425,6 @@ export default function DocumentsPage() {
     }
   };
 
-
   const handleUpload = async () => {
     if (!uploadFile || !uploadTitle) {
       alert("Заполните все поля")
@@ -435,20 +434,44 @@ export default function DocumentsPage() {
     try {
       setUploadLoading(true)
 
+      const dek = window.crypto.getRandomValues(new Uint8Array(32))
+      const cryptoKey = await window.crypto.subtle.importKey(
+        "raw",
+        dek,
+        "AES-GCM",
+        false,
+        ["encrypt"]
+      )
+
+      const iv = window.crypto.getRandomValues(new Uint8Array(12))
+      const fileBuffer = await uploadFile.arrayBuffer()
+
+      const encryptedBuffer = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        cryptoKey,
+        fileBuffer
+      )
+
+      const combined = new Uint8Array(iv.length + encryptedBuffer.byteLength)
+      combined.set(iv, 0)
+      combined.set(new Uint8Array(encryptedBuffer), iv.length)
+
+      const publicPem = currentUser.public_key
+      const publicKey = await importPublicKey(publicPem)
+
+      const encryptedDek = await encryptDEKForUser(dek, publicKey)
+
       const formData = new FormData()
-      formData.append("file", uploadFile)
+      formData.append("file", new Blob([combined]), uploadFile.name)
       formData.append("title", uploadTitle)
       formData.append("description", uploadDescription)
       formData.append("type", uploadType)
+      formData.append("encrypted_dek", arrayBufferToBase64(encryptedDek.buffer))
 
       await createDocument(formData)
 
       setUploadOpen(false)
-
-      setUploadFile(null)
-      setUploadTitle("")
-      setUploadDescription("")
-      setUploadType("")
+      resetUploadForm()
 
       await fetchDocuments()
 

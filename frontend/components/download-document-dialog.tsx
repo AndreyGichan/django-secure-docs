@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { createDownloadLink, downloadEncrypted, downloadDecrypted } from "@/lib/api/documents"
-import { importPrivateKey } from "@/lib/crypto/keys";
 
 interface DownloadDocumentDialogProps {
     open: boolean
@@ -81,7 +80,8 @@ export function DownloadDocumentDialog({
                 await downloadEncrypted(token, documentTitle, documentType);
             } else if (mode === "decrypted") {
                 if (!privateKeyFile) throw new Error("Не выбран приватный ключ")
-                await downloadDecrypted(token, documentId, privateKeyFile, documentTitle, documentType);
+                await downloadDecrypted(token, privateKeyFile, documentTitle, documentType);
+
             }
             setDownloadComplete(true)
         } catch (err) {

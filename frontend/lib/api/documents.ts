@@ -66,9 +66,38 @@ export const downloadEncrypted = async (token: string, documentTitle: string, do
     link.remove();
 };
 
+
+const extractEncryptedContainer = (encryptedData: Uint8Array) => {
+    const headerLength = new DataView(
+        encryptedData.buffer,
+        encryptedData.byteOffset,
+        4
+    ).getUint32(0);
+
+    const headerStart = 4;
+    const headerEnd = 4 + headerLength;
+
+    const headerBytes = encryptedData.slice(headerStart, headerEnd);
+    const headerText = new TextDecoder().decode(headerBytes);
+    const header = JSON.parse(headerText);
+
+    const ivStart = headerEnd;
+    const ivEnd = ivStart + 12;
+
+    const iv = encryptedData.slice(ivStart, ivEnd);
+    const ciphertextWithTag = encryptedData.slice(ivEnd);
+
+    return {
+        documentId: header.documentId as string,
+        iv,
+        ciphertextWithTag,
+    };
+};
+
+
 export const downloadDecrypted = async (
     token: string,
-    documentId: string,
+    // documentId: string,
     privateKeyFile: File,
     documentTitle: string,
     documentType: string
@@ -78,15 +107,19 @@ export const downloadDecrypted = async (
     const pem = await privateKeyFile.text();
     const privateKey = await importPrivateKey(pem);
 
-    const { data: dekResponse } = await getMyEncryptedDEK(documentId)
-    const encryptedDek = Uint8Array.from(atob(dekResponse.encrypted_dek), c => c.charCodeAt(0));
-    const dekBytes = await decryptDEK(encryptedDek, privateKey);
+    const encryptedFileBuffer = await API.get(
+        `documents/download/${token}/`,
+        { responseType: "arraybuffer" }
+    ).then(res => res.data);
 
-    const encryptedFileBuffer = await API.get(`documents/download/${token}/`, { responseType: "arraybuffer" }).then(res => res.data);
     const encryptedData = new Uint8Array(encryptedFileBuffer);
 
-    const iv = encryptedData.slice(0, 12);
-    const ciphertextWithTag = encryptedData.slice(12);
+    const { documentId, iv, ciphertextWithTag } =
+        extractEncryptedContainer(encryptedData);
+
+    const { data: dekResponse } = await getMyEncryptedDEK(documentId);
+    const encryptedDek = Uint8Array.from(atob(dekResponse.encrypted_dek), c => c.charCodeAt(0));
+    const dekBytes = await decryptDEK(encryptedDek, privateKey);
 
 
 
@@ -112,4 +145,34 @@ export const downloadDecrypted = async (
     document.body.appendChild(link);
     link.click();
     link.remove();
+};
+
+
+export const decryptLocalFileOnly = async (
+    encryptedFile: File,
+    dekBytes: ArrayBuffer | Uint8Array
+): Promise<Blob> => {
+    const arrayBuffer = await encryptedFile.arrayBuffer();
+    const encryptedData = new Uint8Array(arrayBuffer);
+
+    const { documentId, iv, ciphertextWithTag } =
+        extractEncryptedContainer(encryptedData);
+
+    const rawKey: ArrayBuffer = new Uint8Array(dekBytes).buffer;
+
+    const cryptoKey = await window.crypto.subtle.importKey(
+        "raw",
+        rawKey,
+        "AES-GCM",
+        false,
+        ["decrypt"]
+    );
+
+    const decryptedArrayBuffer = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        cryptoKey,
+        ciphertextWithTag
+    );
+
+    return new Blob([new Uint8Array(decryptedArrayBuffer)]);
 };

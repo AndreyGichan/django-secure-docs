@@ -3,18 +3,13 @@ from rest_framework import serializers
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
-from .utils.crypto import (
-    generate_dek,
-    encrypt_file,
-    encrypt_dek_for_user,
-    # decrypt_dek_for_user,
-)
 from audit.utils.audit import log_action
 from config.constants import AuditAction
 from audit.utils.request import get_client_ip
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q
+from .utils.file_format import build_encrypted_file_with_header
 
 User = get_user_model()
 
@@ -59,13 +54,16 @@ class DocumentSerializer(serializers.ModelSerializer):
 
 class DocumentCreateSerializer(serializers.ModelSerializer):
     file = serializers.FileField(write_only=True)
+    encrypted_dek = serializers.CharField(write_only=True)
 
     class Meta:
         model = Document
-        fields = ["title", "description", "file"]
+        fields = ["title", "description", "file", "encrypted_dek"]
 
     def create(self, validated_data):
         file = validated_data.pop("file")
+        encrypted_dek_base64 = validated_data.pop("encrypted_dek")
+
         user = self.context["request"].user
         file_name = file.name
         file_size = file.size
@@ -81,16 +79,19 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             document.size = f"{file_size} B"
         document.save()
 
-        dek = generate_dek()
-        file_bytes = file.read()
-        encrypted_bytes = encrypt_file(file_bytes, dek)
-        encrypted_file = ContentFile(encrypted_bytes, name=file.name + ".enc")
+        encrypted_file_name = f"{file.name}.enc"
+        original_bytes = file.read()
+        final_bytes = build_encrypted_file_with_header(original_bytes, document.id)
+        encrypted_file = ContentFile(final_bytes, name=encrypted_file_name)
 
         DocumentVersion.objects.create(
-            document=document, file=encrypted_file, version_number=1, uploaded_by=user
+            document=document,
+            file=encrypted_file,
+            version_number=1,
+            uploaded_by=user,
         )
 
-        encrypted_dek = encrypt_dek_for_user(dek, user.public_key.encode())
+        encrypted_dek = base64.b64decode(encrypted_dek_base64)
 
         DocumentAccess.objects.create(
             document=document, user=user, role="editor", encrypted_dek=encrypted_dek
@@ -175,16 +176,6 @@ class ShareDocumentSerializer(serializers.Serializer):
         document = self.context["document"]
         new_user = User.objects.get(id=validated_data["user_id"])
         owner = document.owner
-
-        # owner_access = DocumentAccess.objects.get(document=document, user=owner)
-
-        # if owner_access.encrypted_dek is None:
-        #     raise serializers.ValidationError("DEK для владельца отсутствует!")
-
-        # # dek = decrypt_dek_for_user(
-        # #     owner_access.encrypted_dek, owner.private_key.encode()
-        # # )
-        # encrypted_dek = encrypt_dek_for_user(dek, new_user.public_key.encode())  # type: ignore
 
         encrypted_dek_base64 = validated_data["encrypted_dek"]
         encrypted_dek = base64.b64decode(encrypted_dek_base64)
