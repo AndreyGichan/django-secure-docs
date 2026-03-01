@@ -296,43 +296,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document = self.get_object()
         access = DocumentAccess.objects.get(document=document, user=request.user)
         encrypted_dek_b64 = base64.b64encode(access.encrypted_dek).decode("utf-8")
-        # version_id = request.query_params.get("version_id")
-        # if version_id:
-        #     version = get_object_or_404(DocumentVersion, id=version_id, document=document)
-        #     access = DocumentAccess.objects.get(document=document, user=request.user, document_version=version)
-        # else:
-        #     access = DocumentAccess.objects.get(document=document, user=request.user)
-        # encrypted_dek_b64 = base64.b64encode(access.encrypted_dek).decode("utf-8")
-        # return Response({"encrypted_dek": encrypted_dek_b64})
 
         return Response({"encrypted_dek": encrypted_dek_b64})
-
-    # @action(
-    #     detail=True,
-    #     methods=["get"],
-    #     permission_classes=[IsAuthenticated, IsOwnerOrHasAccess],
-    # )
-    # def decrypt(self, request, pk=None):
-    #     document = self.get_object()
-
-    #     access = DocumentAccess.objects.get(document=document, user=request.user)
-
-    #     dek = decrypt_dek_for_user(
-    #         access.encrypted_dek, request.user.private_key.encode()
-    #     )
-
-    #     version = document.versions.first()
-    #     encrypted_bytes = version.file.read()
-    #     decrypted_bytes = decrypt_file(encrypted_bytes, dek)
-
-    #     file_like = BytesIO(decrypted_bytes)
-
-    #     response = FileResponse(
-    #         file_like,
-    #         as_attachment=True,
-    #         filename=version.file.name.replace(".enc", ""),
-    #     )
-    #     return response
 
     @action(
         detail=True,

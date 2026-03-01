@@ -13,7 +13,7 @@ def encrypt_file(file_bytes: bytes, dek: bytes) -> bytes:
     cipher = Cipher(algorithms.AES(dek), modes.GCM(nonce), backend=default_backend())
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(file_bytes) + encryptor.finalize()
-    return nonce + encryptor.tag + ciphertext
+    return nonce + ciphertext + encryptor.tag
 
 def decrypt_file(encrypted_bytes: bytes, dek: bytes) -> bytes:
     nonce = encrypted_bytes[:12]
@@ -34,18 +34,3 @@ def encrypt_dek_for_user(dek: bytes, public_key_pem: bytes) -> bytes:
         )
     )
     return encrypted_dek
-
-# def decrypt_dek_for_user(encrypted_dek: bytes, private_key_pem: bytes) -> bytes:
-#     if isinstance(encrypted_dek, memoryview):
-#         encrypted_dek = bytes(encrypted_dek)
-        
-#     private_key = serialization.load_pem_private_key(private_key_pem, password=None)
-#     dek = private_key.decrypt( # type: ignore
-#         encrypted_dek,
-#         padding.OAEP(
-#             mgf=padding.MGF1(algorithm=hashes.SHA256()),
-#             algorithm=hashes.SHA256(),
-#             label=None
-#         )
-#     )
-#     return dek

@@ -86,12 +86,9 @@ export const downloadDecrypted = async (
     const encryptedData = new Uint8Array(encryptedFileBuffer);
 
     const iv = encryptedData.slice(0, 12);
-    const tag = encryptedData.slice(12, 28);
-    const ciphertext = encryptedData.slice(28);
+    const ciphertextWithTag = encryptedData.slice(12);
 
-    const combined = new Uint8Array(ciphertext.length + tag.length);
-    combined.set(ciphertext, 0);
-    combined.set(tag, ciphertext.length);
+
 
     const cryptoKey = await window.crypto.subtle.importKey(
         "raw",
@@ -104,7 +101,7 @@ export const downloadDecrypted = async (
     const decryptedArrayBuffer = await window.crypto.subtle.decrypt(
         { name: "AES-GCM", iv },
         cryptoKey,
-        combined
+        ciphertextWithTag
     );
 
     const blob = new Blob([new Uint8Array(decryptedArrayBuffer)]);
