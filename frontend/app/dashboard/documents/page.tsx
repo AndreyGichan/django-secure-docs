@@ -85,6 +85,7 @@ interface Document {
   status: "active" | "archived" | "draft"
   created_at: string
   updated_at: string
+  my_role: "editor" | "viewer" | null
 }
 
 interface DocumentVersion {
@@ -483,13 +484,38 @@ export default function DocumentsPage() {
   }
 
 
+  // const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0]
+  //   if (!file) return
+
+  //   setUploadFile(file)
+  //   const extension = file.name.split(".").pop()?.toLowerCase() || ""
+  //   const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+
+  //   setUploadType(extension)
+  //   if (!uploadTitle) {
+  //     setUploadTitle(fileNameWithoutExt)
+  //   }
+  // }
+
+  const processSelectedFile = (file: File) => {
+    setUploadFile(file)
+
+    const extension = file.name.split(".").pop()?.toLowerCase() || ""
+    const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+
+    setUploadType(extension)
+
+    if (!uploadTitle) {
+      setUploadTitle(fileNameWithoutExt)
+    }
+  }
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setUploadFile(file)
-    const extension = file.name.split(".").pop()?.toLowerCase() || ""
-    setUploadType(extension)
+    processSelectedFile(file)
   }
 
 
@@ -728,32 +754,49 @@ export default function DocumentsPage() {
                     />
 
                     <div
-                      onClick={() => hiddenFileInput.current?.click()}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        const file = e.dataTransfer.files?.[0]
-                        if (file) handleFileSelect({ target: { files: [file] } } as any)
+                      onClick={() => {
+                        if (!uploadFile) hiddenFileInput.current?.click()
                       }}
-                      className="flex h-28 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 transition-colors hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50"
-                    >
+                      onDragOver={(e) => {
+                        if (!uploadFile) e.preventDefault()
+                      }}
+                      onDrop={(e) => {
+                        if (!uploadFile) {
+                          e.preventDefault()
+                          const file = e.dataTransfer.files?.[0]
+                          if (file) processSelectedFile(file)
+                        }
+                      }}
+                      className={`flex ${uploadFile ? "w-full" : "h-28 cursor-pointer items-center justify-center border-2 border-dashed border-border bg-secondary/30 hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50"} rounded-lg transition-colors`}                    >
 
                       {uploadFile ? (
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-sm text-foreground">{uploadFile.name}</span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
+                        <div className="flex w-full items-center gap-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-3.5 py-3">
+
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/15">
+                            <FileText className="h-4 w-4 text-emerald-400" />
+                          </div>
+
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span className="text-[12px] font-medium text-emerald-400 truncate">
+                              {uploadFile.name}
+                            </span>
+                            <span className="text-[10px] text-emerald-400/50 font-mono">
+                              {(uploadFile.size / 1024).toFixed(1)} KB
+                            </span>
+                          </div>
+
+                          <button
                             onClick={(e) => {
                               e.stopPropagation()
                               setUploadFile(null)
                               setUploadType("")
                               if (hiddenFileInput.current) hiddenFileInput.current.value = ""
                             }}
-                            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                            className="p-1 rounded-md hover:bg-secondary/50 transition-colors"
                           >
-                            <X className="h-3 w-3" />
-                          </Button>
+                            <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                          </button>
+
                         </div>
                       ) : (
                         <div className="flex flex-col items-center gap-2">
@@ -1064,17 +1107,19 @@ export default function DocumentsPage() {
                             </DropdownMenuItem>
                           </>
                         )}
-                        <DropdownMenuItem
-                          className="text-xs tracking-wide font-mono"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            setSelectedDoc(doc);
-                            setUploadVersionOpen(true);
-                          }}
-                        >
-                          <Upload className="mr-2 h-3.5 w-3.5" />
-                          Загрузить новую версию
-                        </DropdownMenuItem>
+                        {doc.my_role !== "viewer" && (
+                          <DropdownMenuItem
+                            className="text-xs tracking-wide font-mono"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setSelectedDoc(doc);
+                              setUploadVersionOpen(true);
+                            }}
+                          >
+                            <Upload className="mr-2 h-3.5 w-3.5" />
+                            Загрузить новую версию
+                          </DropdownMenuItem>
+                        )}
                         {currentUser?.email === doc.owner_email && (
                           <>
                             <DropdownMenuSeparator className="bg-border" />
@@ -1228,7 +1273,7 @@ export default function DocumentsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-4 py-4">
+          <div className="flex flex-col gap-2 py-2">
             <input
               type="file"
               ref={hiddenFileInput}
@@ -1236,30 +1281,49 @@ export default function DocumentsPage() {
               className="hidden"
             />
             <div
-              onClick={() => hiddenFileInput.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const file = e.dataTransfer.files?.[0];
-                if (file) handleFileSelectVersion({ target: { files: [file] } } as any);
+              onClick={() => {
+                if (!uploadFileVersion) hiddenFileInput.current?.click()
               }}
-              className="flex h-28 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 transition-colors hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50"
+              onDragOver={(e) => {
+                if (!uploadFileVersion) e.preventDefault()
+              }}
+              onDrop={(e) => {
+                if (!uploadFileVersion) {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) handleFileSelectVersion({ target: { files: [file] } } as any);
+                }
+              }}
+              className={`flex ${uploadFileVersion ? "w-full" : "h-28 cursor-pointer items-center justify-center border-2 border-dashed border-border bg-secondary/30 transition-colors hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50"} rounded-lg transition-colors`}
             >
               {uploadFileVersion ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm text-foreground">{uploadFileVersion.name}</span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
+                <div className="flex w-full items-center gap-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-3.5 py-3">
+
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/15">
+                    <FileText className="h-4 w-4 text-emerald-400" />
+                  </div>
+
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="text-[12px] font-medium text-emerald-400 truncate">
+                      {uploadFileVersion.name}
+                    </span>
+                    {/* <span className="text-[10px] text-emerald-400/50 font-mono">
+                    {(uploadFileVersion.size / 1024).toFixed(1)} KB
+                  </span> */}
+                  </div>
+
+                  <button
                     onClick={(e) => {
-                      e.stopPropagation();
-                      setUploadFileVersion(null);
-                      if (hiddenFileInput.current) hiddenFileInput.current.value = "";
+                      e.stopPropagation()
+                      setUploadFileVersion(null)
+                      setUploadType("")
+                      if (hiddenFileInput.current) hiddenFileInput.current.value = ""
                     }}
-                    className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    className="p-1 rounded-md hover:bg-secondary/50 transition-colors"
                   >
-                    <X className="h-3 w-3" />
-                  </Button>
+                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                  </button>
+
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
@@ -1531,15 +1595,17 @@ export default function DocumentsPage() {
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Version History</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-2 text-[12px] tracking-wide font-mono bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary flex items-center gap-1"
-                      onClick={() => setUploadVersionOpen(true)}
-                    >
-                      <Upload className="h-3 w-3" />
-                      Загрузить версию
-                    </Button>
+                    {selectedDoc?.my_role !== "viewer" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-[12px] tracking-wide font-mono bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary flex items-center gap-1"
+                        onClick={() => setUploadVersionOpen(true)}
+                      >
+                        <Upload className="h-3 w-3" />
+                        Загрузить версию
+                      </Button>
+                    )}
                   </div>
 
                   <div className="mt-2 flex flex-col gap-1.5">

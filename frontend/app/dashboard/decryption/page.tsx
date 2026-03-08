@@ -85,14 +85,14 @@ export default function DecryptionPage() {
       const encryptedDek = Uint8Array.from(atob(dekResponse.encrypted_dek), c => c.charCodeAt(0))
       const dekBytes = await decryptDEK(encryptedDek, privateKey)
 
-      const decryptedBlob = await decryptLocalFileOnly(encryptedFile!, dekBytes)
+      // const decryptedBlob = await decryptLocalFileOnly(encryptedFile!, dekBytes)
 
       clearInterval(interval)
       setProgress(100)
       setState("success")
 
       const blob = await decryptLocalFileOnly(encryptedFile!, dekBytes)
-      setDecryptedBlob(blob)       // <-- сохраняем в state
+      setDecryptedBlob(blob)
       setProgress(100)
       setState("success")
 

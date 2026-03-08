@@ -72,7 +72,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return DocumentSerializer
 
     def get_permissions(self):
-        if self.action in ["retrieve", "update", "partial_update", "destroy"]:
+        if self.action in ["retrieve", "update", "partial_update", "destroy",  "upload_version"]:
             return [IsAuthenticated(), IsOwnerOrHasAccess()]
         return [IsAuthenticated()]
 
@@ -148,6 +148,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": "New version uploaded"}, status=status.HTTP_201_CREATED
             )
+        
+        if user != document.owner and not DocumentAccess.objects.filter(
+            document=document,
+            user=user,
+            role="editor",
+            revoked_at__isnull=True
+        ).exists():
+            return Response({"detail": "No edit permission"}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

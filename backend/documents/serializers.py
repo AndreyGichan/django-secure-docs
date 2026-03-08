@@ -20,6 +20,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     shared_with = serializers.SerializerMethodField()
     version = serializers.SerializerMethodField()
+    my_role = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
@@ -37,6 +38,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "version",
             "created_at",
             "updated_at",
+            "my_role",
         ]
         read_only_fields = ["owner", "type", "size", "shared_with", "version"]
 
@@ -50,6 +52,30 @@ class DocumentSerializer(serializers.ModelSerializer):
     def get_version(self, obj):
         latest_version = obj.versions.order_by("-version_number").first()
         return latest_version.version_number if latest_version else None
+    
+    def get_my_role(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return None
+
+        user = request.user
+
+        if obj.owner == user:
+            return "owner"
+
+        access = DocumentAccess.objects.filter(
+            document=obj,
+            user=user,
+            revoked_at__isnull=True
+        ).first()
+
+        if not access:
+            return None
+
+        if access.expires_at and access.expires_at < timezone.now():
+            return None
+
+        return access.role
 
 
 class DocumentCreateSerializer(serializers.ModelSerializer):

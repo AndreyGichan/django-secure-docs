@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission
 from .models import DocumentAccess
+from django.utils import timezone
 
 
 class IsOwnerOrHasAccess(BasePermission):
@@ -18,8 +19,17 @@ class CanEditDocument(BasePermission):
         if obj.owner == request.user:
             return True
 
-        return DocumentAccess.objects.filter(
+        access = DocumentAccess.objects.filter(
             document=obj,
             user=request.user,
-            role='editor'
-        ).exists()
+            role='editor',
+            revoked_at__isnull=True,
+        ).first()
+
+        if not access:
+            return False
+
+        if access.expires_at and access.expires_at < timezone.now(): # type: ignore
+            return False
+
+        return True
