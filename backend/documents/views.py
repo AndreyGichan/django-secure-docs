@@ -71,11 +71,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return DocumentCreateSerializer
         return DocumentSerializer
 
-    def get_permissions(self):
-        if self.action in ["retrieve", "update", "partial_update", "destroy",  "upload_version"]:
-            return [IsAuthenticated(), IsOwnerOrHasAccess()]
-        return [IsAuthenticated()]
+    # def get_permissions(self):
+    #     if self.action in ["retrieve", "update", "partial_update", "destroy",  "upload_version"]:
+    #         return [IsAuthenticated(), IsOwnerOrHasAccess()]
+    #     return [IsAuthenticated()]
 
+    def get_permissions(self):
+        if self.action in ["retrieve", "update", "partial_update", "destroy"]:
+            return [IsAuthenticated(), IsOwnerOrHasAccess()]
+
+        if self.action == "upload_version":
+            return [IsAuthenticated(), CanEditDocument()]
+
+        return [IsAuthenticated()]
+    
     @action(
         detail=True,
         methods=["get"],
@@ -127,9 +136,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 status=version_status,
             )
 
-            last_access = DocumentAccess.objects.get(document=document, user=user)
-            last_access.last_access = timezone.now()
-            last_access.save()
+            # last_access = DocumentAccess.objects.get(document=document, user=user)
+            # last_access.last_access = timezone.now()
+            # last_access.save()
+            last_access = DocumentAccess.objects.filter(
+                document=document,
+                user=user
+            ).first()
+
+            if last_access:
+                last_access.last_access = timezone.now()
+                last_access.save()
 
             log_action(
                 user=user,
@@ -149,13 +166,13 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 {"detail": "New version uploaded"}, status=status.HTTP_201_CREATED
             )
         
-        if user != document.owner and not DocumentAccess.objects.filter(
-            document=document,
-            user=user,
-            role="editor",
-            revoked_at__isnull=True
-        ).exists():
-            return Response({"detail": "No edit permission"}, status=status.HTTP_403_FORBIDDEN)
+        # if user != document.owner and not DocumentAccess.objects.filter(
+        #     document=document,
+        #     user=user,
+        #     role="editor",
+        #     revoked_at__isnull=True
+        # ).exists():
+        #     return Response({"detail": "No edit permission"}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -281,6 +298,12 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": "Link expired"}, status=status.HTTP_400_BAD_REQUEST
             )
+        
+        document = link.document_version.document
+        user = request.user
+
+        if document.status == "draft" and document.owner != user:
+            return Response({"detail": "Only owner can download draft document"}, status=403)
 
         file = link.document_version.file
 

@@ -380,7 +380,7 @@ export default function DecryptionPage() {
                       <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
                       <div className="flex flex-col">
                         <span className="text-xs font-medium font-mono text-emerald-400">Расшифровка завершена</span>
-                        <span className="text-[10px] font-mono text-emerald-400/60">Расшифрованный файл сохранен на ваше устройство</span>
+                        <span className="text-[10px] font-mono text-emerald-400/60">Файл расшифрован и доступен для скачивания</span>
                       </div>
                     </div>
                   )}
@@ -412,7 +412,7 @@ export default function DecryptionPage() {
                           }}
                         >
                           <Download className="h-3.5 w-3.5" />
-                          Сохранить рассшифрованный файл
+                          Скачать расшифрованный файл
                         </Button>
                         <Button
                           variant="outline"

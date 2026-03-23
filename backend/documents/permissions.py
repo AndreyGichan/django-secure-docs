@@ -5,31 +5,56 @@ from django.utils import timezone
 
 class IsOwnerOrHasAccess(BasePermission):
     def has_object_permission(self, request, view, obj): # type: ignore
-        if obj.owner == request.user:
-            return True
+        user = request.user
 
-        return DocumentAccess.objects.filter(
-            document=obj,
-            user=request.user
-        ).exists()
-
-
-class CanEditDocument(BasePermission):
-    def has_object_permission(self, request, view, obj): # type: ignore
-        if obj.owner == request.user:
+        if obj.owner == user:
             return True
 
         access = DocumentAccess.objects.filter(
             document=obj,
-            user=request.user,
-            role='editor',
-            revoked_at__isnull=True,
+            user=user,
+            revoked_at__isnull=True
         ).first()
 
         if not access:
             return False
 
-        if access.expires_at and access.expires_at < timezone.now(): # type: ignore
+        if access.expires_at and access.expires_at < timezone.now():
+            return False
+
+        if obj.status == "draft":
+            return False 
+
+        if obj.status in ["active", "archived"]:
+            return True
+
+        return False
+
+
+class CanEditDocument(BasePermission):
+    def has_object_permission(self, request, view, obj): # type: ignore
+        user = request.user
+
+        if obj.status == "archived":
+            return False
+
+        if obj.status == "draft":
+            return obj.owner == user
+
+        if obj.owner == user:
+            return True
+
+        access = DocumentAccess.objects.filter(
+            document=obj,
+            user=user,
+            role="editor",
+            revoked_at__isnull=True
+        ).first()
+
+        if not access:
+            return False
+
+        if access.expires_at and access.expires_at < timezone.now():
             return False
 
         return True

@@ -85,7 +85,7 @@ interface Document {
   status: "active" | "archived" | "draft"
   created_at: string
   updated_at: string
-  my_role: "editor" | "viewer" | null
+  my_role: "owner" | "editor" | "viewer" | null
 }
 
 interface DocumentVersion {
@@ -261,7 +261,7 @@ export default function DocumentsPage() {
   const [uploadFileVersion, setUploadFileVersion] = useState<File | null>(null);
   const [uploadLoadingVersion, setUploadLoadingVersion] = useState(false);
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(15)
+  const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
@@ -682,6 +682,28 @@ export default function DocumentsPage() {
     }
   };
 
+  function canDownload(doc: Document) {
+    if (doc.status === "draft") {
+      return doc.my_role === "owner"
+    }
+
+    return doc.status === "active" || doc.status === "archived"
+  }
+
+  function canUpload(doc: Document) {
+    if (doc.status === "archived") return false
+
+    if (doc.status === "draft") {
+      return doc.my_role === "owner"
+    }
+
+    if (doc.status === "active") {
+      return doc.my_role === "owner" || doc.my_role === "editor"
+    }
+
+    return false
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -1080,17 +1102,19 @@ export default function DocumentsPage() {
                           <Eye className="mr-2 h-3.5 w-3.5" />
                           Сведения
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-xs tracking-wide font-mono"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDownloadDoc(doc)
-                            setDownloadOpen(true)
-                          }}
-                        >
-                          <Download className="mr-2 h-3.5 w-3.5" />
-                          Скачать
-                        </DropdownMenuItem>
+                        {canDownload(doc) && (
+                          <DropdownMenuItem
+                            className="text-xs tracking-wide font-mono"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDownloadDoc(doc)
+                              setDownloadOpen(true)
+                            }}
+                          >
+                            <Download className="mr-2 h-3.5 w-3.5" />
+                            Скачать
+                          </DropdownMenuItem>
+                        )}
 
                         {currentUser?.email === doc.owner_email && (
                           <>
@@ -1107,7 +1131,7 @@ export default function DocumentsPage() {
                             </DropdownMenuItem>
                           </>
                         )}
-                        {doc.my_role !== "viewer" && (
+                        {canUpload(doc) && (
                           <DropdownMenuItem
                             className="text-xs tracking-wide font-mono"
                             onClick={async (e) => {
@@ -1595,7 +1619,7 @@ export default function DocumentsPage() {
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Version History</span>
-                    {selectedDoc?.my_role !== "viewer" && (
+                    {selectedDoc?.my_role !== "viewer" && canUpload(selectedDoc) &&(
                       <Button
                         size="sm"
                         variant="outline"
@@ -1667,18 +1691,20 @@ export default function DocumentsPage() {
                     Поделиться
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 text-xs tracking-wide font-mono"
-                  onClick={() => {
-                    setDetailOpen(false)
-                    setDownloadDoc(selectedDoc)
-                    setDownloadOpen(true)
-                  }}
-                >
-                  <Download className="h-3 w-3" />
-                  Скачать
-                </Button>
+                {canDownload(selectedDoc) && (
+                  <Button
+                    size="sm"
+                    className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 text-xs tracking-wide font-mono"
+                    onClick={() => {
+                      setDetailOpen(false)
+                      setDownloadDoc(selectedDoc)
+                      setDownloadOpen(true)
+                    }}
+                  >
+                    <Download className="h-3 w-3" />
+                    Скачать
+                  </Button>
+                )}
               </DialogFooter>
             </>
           )}
