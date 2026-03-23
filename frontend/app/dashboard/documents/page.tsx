@@ -278,6 +278,9 @@ export default function DocumentsPage() {
   const [downloadDoc, setDownloadDoc] = useState<Document | null>(null)
   const [versions, setVersions] = useState<DocumentVersion[]>([])
   const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null)
+  const [titleEdit, setTitleEdit] = useState("");
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null)
+  const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null)
 
 
   const hiddenFileInput = useRef<HTMLInputElement>(null)
@@ -299,8 +302,8 @@ export default function DocumentsPage() {
   useEffect(() => {
     if (selectedDoc) {
       setDescriptionEdit(selectedDoc.description || "")
+      setTitleEdit(selectedDoc.title || "");
     }
-    setEditingDocId(null)
   }, [selectedDoc])
 
 
@@ -1457,10 +1460,72 @@ export default function DocumentsPage() {
                     {getFileIcon(selectedDoc.type)}
                   </div>
                   <div>
-                    <DialogTitle className="text-foreground text-sm">{selectedDoc.title}.{selectedDoc.type}</DialogTitle>
-                    <DialogDescription className="text-muted-foreground text-xs">
-                      {selectedDoc.size} - Version {selectedDoc.version}
-                    </DialogDescription>
+                    <span className="sr-only">
+                      <DialogTitle>{selectedDoc.title}</DialogTitle>
+                    </span>
+                    {/* <DialogTitle className="text-foreground text-sm">{selectedDoc.title}.{selectedDoc.type}</DialogTitle> */}
+                    <div className="flex items-center gap-2">
+                      {editingTitleId === selectedDoc.id ? (
+                        <>
+                          <Textarea
+                            value={titleEdit}
+                            onChange={(e) => setTitleEdit(e.target.value)}
+                            className="text-xs bg-secondary/50 border-border text-foreground font-mono overflow-hidden h-9 min-h-[8px]"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              if (!selectedDoc) return
+                              try {
+                                await updateDocument(selectedDoc.id, { title: titleEdit })
+                                setDocuments(docs =>
+                                  docs.map(doc =>
+                                    doc.id === selectedDoc.id ? { ...doc, title: titleEdit } : doc
+                                  )
+                                )
+                                setSelectedDoc(doc => doc ? { ...doc, title: titleEdit } : null)
+                                setEditingTitleId(null)
+                              } catch (err) {
+                                console.error("Failed to update title", err)
+                              }
+                            }}
+                            className="h-8 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground text-xs border-0 hover:opacity-90"
+                          >
+                            Сохранить
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              if (selectedDoc) setTitleEdit(selectedDoc.title || "")
+                              setEditingTitleId(null)
+                            }}
+                            className="h-8 text-xs"
+                          >
+                            Отмена
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <DialogTitle className="text-foreground text-sm">{selectedDoc.title}.{selectedDoc.type}</DialogTitle>
+                          {currentUser?.email === selectedDoc?.owner_email && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              onClick={() => setEditingTitleId(selectedDoc.id)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div className="mt-1">
+                      <DialogDescription className="text-muted-foreground text-xs">
+                        {selectedDoc.size} - Version {selectedDoc.version}
+                      </DialogDescription>
+                    </div>
                   </div>
                 </div>
               </DialogHeader>
@@ -1546,20 +1611,20 @@ export default function DocumentsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                          onClick={() => setEditingDocId(selectedDoc.id)}
+                          onClick={() => setEditingDescriptionId(selectedDoc.id)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       )}
                   </div>
 
-                  {editingDocId === selectedDoc?.id ? (
+                  {editingDescriptionId === selectedDoc?.id ? (
                     <div className="flex gap-2 items-center">
                       <Textarea
                         value={descriptionEdit}
                         ref={textareaRef}
                         onChange={(e) => setDescriptionEdit(e.target.value)}
-                        className="text-xs bg-secondary/50 border-border text-foreground font-mono resize-none overflow-hidden min-h-[24px] leading-snug"
+                        className="text-xs bg-secondary/50 border-border text-foreground font-mono overflow-hidden h-9 min-h-[8px]"
                       />
 
                       <Button
@@ -1583,7 +1648,7 @@ export default function DocumentsPage() {
                               doc ? { ...doc, description: descriptionEdit } : null
                             )
 
-                            setEditingDocId(null)
+                            setEditingDescriptionId(null)
                           } catch (error) {
                             console.error("Failed to update description", error)
                           }
@@ -1600,7 +1665,7 @@ export default function DocumentsPage() {
                           if (selectedDoc) {
                             setDescriptionEdit(selectedDoc.description || "")
                           }
-                          setEditingDocId(null)
+                          setEditingDescriptionId(null)
                         }}
                         className="h-8 text-xs"
                       >
@@ -1619,7 +1684,7 @@ export default function DocumentsPage() {
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Version History</span>
-                    {selectedDoc?.my_role !== "viewer" && canUpload(selectedDoc) &&(
+                    {selectedDoc?.my_role !== "viewer" && canUpload(selectedDoc) && (
                       <Button
                         size="sm"
                         variant="outline"
