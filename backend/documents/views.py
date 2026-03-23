@@ -136,9 +136,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 status=version_status,
             )
 
-            # last_access = DocumentAccess.objects.get(document=document, user=user)
-            # last_access.last_access = timezone.now()
-            # last_access.save()
+            file_size = file.size
+            if file_size >= 1024 * 1024:
+                document.size = f"{round(file_size / 1024 / 1024, 2)} MB"
+            elif file_size >= 1024:
+                document.size = f"{round(file_size / 1024, 2)} KB"
+            else:
+                document.size = f"{file_size} B"
+            document.save()
+
             last_access = DocumentAccess.objects.filter(
                 document=document,
                 user=user

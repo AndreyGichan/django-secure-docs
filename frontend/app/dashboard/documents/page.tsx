@@ -69,7 +69,7 @@ import { ShareDocumentDialog } from "@/components/share-document-dialog"
 import { DownloadDocumentDialog } from "@/components/download-document-dialog"
 import { getDocuments } from "@/lib/api/documents";
 import { getCurrentUser, searchUsers } from "@/lib/api/auth"
-import { updateDocument, createDocument, uploadDocumentVersion, deleteDocument, approveDocumentVersion, getDocumentVersions, getMyEncryptedDEK } from "@/lib/api/documents"
+import { updateDocument, createDocument, getDocument, uploadDocumentVersion, deleteDocument, approveDocumentVersion, getDocumentVersions, getMyEncryptedDEK } from "@/lib/api/documents"
 import { decryptDEK, importPrivateKey, importPublicKey, encryptDEKForUser, arrayBufferToBase64 } from "@/lib/crypto/keys";
 
 interface Document {
@@ -675,6 +675,16 @@ export default function DocumentsPage() {
       setUploadVersionOpen(false);
       setUploadFileVersion(null);
       setPrivateKeyFile(null);
+
+      const versionsRes = await getDocumentVersions(selectedDoc.id);
+      setVersions(versionsRes.data);
+
+      const updatedDocRes = await getDocument(selectedDoc.id); 
+      setSelectedDoc(updatedDocRes.data);
+
+      setDocuments((docs) =>
+        docs.map((d) => (d.id === updatedDocRes.data.id ? updatedDocRes.data : d))
+      );
 
       await fetchDocuments();
     } catch (err) {
