@@ -128,13 +128,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
             version_status = "approved" if user == document.owner else "pending"
 
-            DocumentVersion.objects.create(
+            version = DocumentVersion.objects.create(
                 document=document,
                 file=encrypted_file,
                 version_number=new_version_number,
                 uploaded_by=user,
                 status=version_status,
             )
+
+            if version_status == "approved":
+                document.current_version = version
+                document.save()
 
             file_size = file.size
             if file_size >= 1024 * 1024:
@@ -209,6 +213,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
         version.status = "approved"
         version.save()
 
+        document.current_version = version
+        document.save()
+
         log_action(
             user=request.user,
             action=AuditAction.APPROVE,
@@ -270,9 +277,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if version_id:
             version = get_object_or_404(DocumentVersion, id=version_id, document=document)
         else:
-            version = document.versions.filter(status="approved").order_by("-version_number").first()
-            if not version:
-                return Response({"detail": "No approved version available."}, status=400)
+            # version = document.versions.filter(status="approved").order_by("-version_number").first()
+            version = document.current_version
+
+        if not version:
+            return Response({"detail": "No approved version available."}, status=status.HTTP_400_BAD_REQUEST)
 
         expires_at = timezone.now() + timedelta(hours=1)
 
@@ -430,3 +439,28 @@ class DocumentViewSet(viewsets.ModelViewSet):
         access.save()
 
         return Response({"detail": "Access revoked"})
+    
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def set_current_version(self, request, pk=None):
+        document = self.get_object()
+
+        if document.owner != request.user:
+            return Response({"detail": "Only owner can change version"}, status=status.HTTP_403_FORBIDDEN)
+
+        version_id = request.data.get("version_id")
+
+        version = get_object_or_404(
+            DocumentVersion,
+            id=version_id,
+            document=document,
+            status="approved"
+        )
+
+        document.current_version = version
+        document.save()
+
+        return Response({
+            "detail": f"Current version set to v{version.version_number}"
+        })
+
+

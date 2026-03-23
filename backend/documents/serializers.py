@@ -21,6 +21,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     shared_with = serializers.SerializerMethodField()
     version = serializers.SerializerMethodField()
     my_role = serializers.SerializerMethodField()
+    current_version_number = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
@@ -39,19 +40,28 @@ class DocumentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "my_role",
+            "current_version_number"
         ]
         read_only_fields = ["owner", "type", "size", "shared_with", "version"]
 
     def get_shared_with(self, obj):
-        approved_version = (
-            obj.versions.filter(status="approved").order_by("-version_number").first()
-        )
-
-        return approved_version.version_number if approved_version else None
+        return obj.access_list.filter(
+            revoked_at__isnull=True
+        ).count()
 
     def get_version(self, obj):
-        latest_version = obj.versions.order_by("-version_number").first()
-        return latest_version.version_number if latest_version else None
+        # latest_version = obj.versions.order_by("-version_number").first()
+        # return latest_version.version_number if latest_version else None
+        # latest_version = obj.versions.filter(status="approved").order_by("-version_number").first()
+        # return latest_version.version_number if latest_version else None
+        if obj.current_version:
+            return obj.current_version.version_number
+        return None
+
+    def get_current_version_number(self, obj):
+        if obj.current_version:
+            return obj.current_version.version_number
+        return None
     
     def get_my_role(self, obj):
         request = self.context.get("request")
@@ -110,12 +120,14 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         final_bytes = build_encrypted_file_with_header(original_bytes, document.id)
         encrypted_file = ContentFile(final_bytes, name=encrypted_file_name)
 
-        DocumentVersion.objects.create(
+        version = DocumentVersion.objects.create(
             document=document,
             file=encrypted_file,
             version_number=1,
             uploaded_by=user,
         )
+        document.current_version = version # type: ignore
+        document.save()
 
         encrypted_dek = base64.b64decode(encrypted_dek_base64)
 

@@ -69,7 +69,7 @@ import { ShareDocumentDialog } from "@/components/share-document-dialog"
 import { DownloadDocumentDialog } from "@/components/download-document-dialog"
 import { getDocuments } from "@/lib/api/documents";
 import { getCurrentUser, searchUsers } from "@/lib/api/auth"
-import { updateDocument, createDocument, getDocument, uploadDocumentVersion, deleteDocument, approveDocumentVersion, getDocumentVersions, getMyEncryptedDEK } from "@/lib/api/documents"
+import { updateDocument, createDocument, getDocument, uploadDocumentVersion, deleteDocument, approveDocumentVersion, setCurrentVersion, getDocumentVersions, getMyEncryptedDEK } from "@/lib/api/documents"
 import { decryptDEK, importPrivateKey, importPublicKey, encryptDEKForUser, arrayBufferToBase64 } from "@/lib/crypto/keys";
 
 interface Document {
@@ -486,21 +486,6 @@ export default function DocumentsPage() {
     }
   }
 
-
-  // const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0]
-  //   if (!file) return
-
-  //   setUploadFile(file)
-  //   const extension = file.name.split(".").pop()?.toLowerCase() || ""
-  //   const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
-
-  //   setUploadType(extension)
-  //   if (!uploadTitle) {
-  //     setUploadTitle(fileNameWithoutExt)
-  //   }
-  // }
-
   const processSelectedFile = (file: File) => {
     setUploadFile(file)
 
@@ -612,13 +597,52 @@ export default function DocumentsPage() {
       await approveDocumentVersion(selectedDoc.id, versionId)
 
       const res = await getDocumentVersions(selectedDoc.id)
-      setVersions(res.data)
 
-      await fetchDocuments()
+      const updatedVersions = res.data.map((v: DocumentVersion) => {
+        if (v.id === versionId) return { ...v, status: "approved" };
+        return v;
+      });
+
+      setVersions(updatedVersions)
+
+      const updatedDoc = await getDocument(selectedDoc.id);
+      setSelectedDoc(updatedDoc.data);
+
+
+      setDocuments((docs) =>
+        docs.map((d) => (d.id === updatedDoc.data.id ? updatedDoc.data : d))
+      );
+
     } catch (error) {
       console.error("Failed to approve version", error)
     }
   }
+
+  const handleSetCurrentVersion = async (versionId: number) => {
+    if (!selectedDoc) return;
+
+    try {
+      await setCurrentVersion(selectedDoc.id, versionId);
+
+      const versionsRes = await getDocumentVersions(selectedDoc.id);
+
+      const updatedVersions = versionsRes.data.map((v: DocumentVersion) => ({
+        ...v,
+        isCurrent: v.id === versionId,
+      }));
+
+      setVersions(updatedVersions);
+
+      const updatedDoc = await getDocument(selectedDoc.id);
+      setSelectedDoc(updatedDoc.data);
+
+      setDocuments((docs) =>
+        docs.map((d) => (d.id === updatedDoc.data.id ? updatedDoc.data : d))
+      );
+    } catch (error) {
+      console.error("Failed to set current version", error);
+    }
+  };
 
   const getVersionLabel = (v: DocumentVersion, isCurrent: boolean) => {
     if (isCurrent) return "текущая";
@@ -679,7 +703,7 @@ export default function DocumentsPage() {
       const versionsRes = await getDocumentVersions(selectedDoc.id);
       setVersions(versionsRes.data);
 
-      const updatedDocRes = await getDocument(selectedDoc.id); 
+      const updatedDocRes = await getDocument(selectedDoc.id);
       setSelectedDoc(updatedDocRes.data);
 
       setDocuments((docs) =>
@@ -1709,12 +1733,8 @@ export default function DocumentsPage() {
 
                   <div className="mt-2 flex flex-col gap-1.5">
                     {(() => {
-                      const lastApprovedVersion = versions
-                        .filter(v => v.status === "approved")
-                        .sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0];
-
                       return versions.map((v) => {
-                        const isCurrent = v.id === lastApprovedVersion?.id;
+                        const isCurrent = v.version_number === selectedDoc.version;
 
                         return (
                           <div
@@ -1728,20 +1748,45 @@ export default function DocumentsPage() {
                               </span>
 
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 justify-end w-[8rem]">
+                              {currentUser?.email === selectedDoc?.owner_email ? (
+                                <>
+                                  {getVersionStatusBadge(v.status)}
+                                  {!isCurrent ? (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <button className="text-muted-foreground hover:text-foreground">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                        </button>
+                                      </DropdownMenuTrigger>
 
+                                      <DropdownMenuContent align="end">
+                                        {v.status === "pending" && (
+                                          <DropdownMenuItem
+                                            className="text-xs tracking-wide font-mono"
+                                            onClick={() => handleApproveVersion(v.id)}
+                                          >
+                                            Одобрить
+                                          </DropdownMenuItem>
+                                        )}
 
-                              {getVersionStatusBadge(v.status)}
-                              {v.status === "pending" && currentUser?.email === selectedDoc?.owner_email && (
-                                <button
-                                  onClick={() => handleApproveVersion(v.id)}
-                                  className="text-[10px] font-mono rounded-sm tracking-wide inline-flex items-center gap-1 px-2 py-0.5 cursor-pointer bg-emerald-500/15 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-500/20"
-                                >
-                                  Одобрить
-                                </button>
+                                        {v.status === "approved" && (
+                                          <DropdownMenuItem
+                                            className="text-xs tracking-wide font-mono"
+                                            onClick={() => handleSetCurrentVersion(v.id)}
+                                          >
+                                            Сделать текущей
+                                          </DropdownMenuItem>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  ) : (
+                                    <div className="w-4 h-4" />
+                                  )}
+                                </>
+                              ) : (
+                                getVersionStatusBadge(v.status)
                               )}
-
-
                             </div>
                           </div>
                         )

@@ -26,6 +26,13 @@ export const approveDocumentVersion = (
     API.post(`documents/${documentId}/approve_version/`, {
         version_id: versionId,
     });
+export const setCurrentVersion = (
+    documentId: string,
+    versionId: number
+) =>
+    API.post(`documents/${documentId}/set_current_version/`, {
+        version_id: versionId,
+    });
 export const shareDocument = (documentId: string, data: {
     user_id: string;
     role: string;

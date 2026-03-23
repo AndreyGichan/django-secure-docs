@@ -18,7 +18,15 @@ class Document(models.Model):
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)    
+    updated_at = models.DateTimeField(auto_now=True)
+
+    current_version = models.ForeignKey(
+        "DocumentVersion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="current_for_documents"
+    )    
 
     def __str__(self):
         return f"{self.title} ({self.owner.email})"
