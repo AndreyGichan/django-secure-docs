@@ -10,7 +10,7 @@ from datetime import timedelta
 from django.db import models
 from django.http import FileResponse
 from django.core.files.base import ContentFile
-from django.db.models import Q
+from django.db.models import Count, Q, F
 
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 from .serializers import (
@@ -63,6 +63,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
             Q(access_list__user=user, access_list__revoked_at__isnull=True,
             access_list__expires_at__isnull=True)
         ).distinct()
+
+        qs = qs.annotate(
+            shared_with_count=Count(
+                'access_list',
+                filter=Q(access_list__revoked_at__isnull=True)
+            )
+        )
+
+        # обработка сортировки
+        ordering = self.request.GET.get("ordering")
+        if ordering:
+            qs = qs.order_by(ordering)
+        else:
+            qs = qs.order_by("-updated_at")
 
         return qs
 

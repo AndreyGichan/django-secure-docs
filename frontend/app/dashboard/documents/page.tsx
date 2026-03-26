@@ -279,7 +279,7 @@ export default function DocumentsPage() {
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [shareDoc, setShareDoc] = useState<Document | null>(null)
   const [downloadOpen, setDownloadOpen] = useState(false)
-  const [downloadDoc, setDownloadDoc] = useState<DownloadDocument  | null>(null)
+  const [downloadDoc, setDownloadDoc] = useState<DownloadDocument | null>(null)
   const [versions, setVersions] = useState<DocumentVersion[]>([])
   const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null)
   const [titleEdit, setTitleEdit] = useState("");
@@ -743,6 +743,30 @@ export default function DocumentsPage() {
     }
 
     return false
+  }
+
+  function getPaginationPages(currentPage: number, totalPages: number, maxVisible = 3): (number | "...")[] {
+    const pages: (number | "...")[] = []
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+      return pages
+    }
+
+    const half = Math.floor(maxVisible / 2)
+    let start = Math.max(2, currentPage - half)
+    let end = Math.min(totalPages - 1, currentPage + half)
+
+    if (currentPage - 1 <= half) start = 2
+    if (totalPages - currentPage <= half) end = totalPages - 1
+
+    pages.push(1)
+    if (start > 2) pages.push("...")
+    for (let i = start; i <= end; i++) pages.push(i)
+    if (end < totalPages - 1) pages.push("...")
+    pages.push(totalPages)
+
+    return pages
   }
 
   return (
@@ -1291,12 +1315,13 @@ export default function DocumentsPage() {
               size="icon"
               className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
               disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
+              // onClick={() => setPage((p) => p - 1)}
+              onClick={() => page > 1 && setPage(page - 1)}
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
 
-            {Array.from({ length: totalPages }, (_, i) => {
+            {/* {Array.from({ length: totalPages }, (_, i) => {
               const pageNumber = i + 1
               const isActive = pageNumber === page
 
@@ -1314,7 +1339,25 @@ export default function DocumentsPage() {
                   {pageNumber}
                 </Button>
               )
-            })}
+            })} */}
+            {getPaginationPages(page, totalPages).map((p, idx) =>
+              p === "..." ? (
+                <span key={idx} className="px-2 py-1 text-muted-foreground">…</span>
+              ) : (
+                <Button
+                  key={idx}
+                  size="sm"
+                  variant={p === page ? "default" : "outline"}
+                  onClick={() => setPage(p as number)}
+                  className={`h-7 min-w-7 text-xs ${p === page
+                      ? "bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0"
+                      : "bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    }`}
+                >
+                  {p}
+                </Button>
+              )
+            )}
 
             {/* Next */}
             <Button
@@ -1322,7 +1365,8 @@ export default function DocumentsPage() {
               size="icon"
               className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
               disabled={page === totalPages}
-              onClick={() => setPage((p) => p + 1)}
+              // onClick={() => setPage((p) => p + 1)}
+              onClick={() => page < totalPages && setPage(page + 1)}
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </Button>
