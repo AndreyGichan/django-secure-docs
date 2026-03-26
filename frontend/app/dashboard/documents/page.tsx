@@ -95,6 +95,10 @@ interface DocumentVersion {
   uploaded_at: string
 }
 
+type DownloadDocument = Document & {
+  versionId?: number
+}
+
 function getFileIcon(type: string) {
   switch (type) {
     case "pdf":
@@ -275,7 +279,7 @@ export default function DocumentsPage() {
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const [shareDoc, setShareDoc] = useState<Document | null>(null)
   const [downloadOpen, setDownloadOpen] = useState(false)
-  const [downloadDoc, setDownloadDoc] = useState<Document | null>(null)
+  const [downloadDoc, setDownloadDoc] = useState<DownloadDocument  | null>(null)
   const [versions, setVersions] = useState<DocumentVersion[]>([])
   const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null)
   const [titleEdit, setTitleEdit] = useState("");
@@ -1266,6 +1270,7 @@ export default function DocumentsPage() {
             documentTitle={downloadDoc.title}
             documentId={downloadDoc.id}
             documentType={downloadDoc.type}
+            versionId={downloadDoc.versionId}
           />
         )}
 
@@ -1778,6 +1783,19 @@ export default function DocumentsPage() {
                                             Сделать текущей
                                           </DropdownMenuItem>
                                         )}
+                                        <DropdownMenuItem
+                                          className="text-xs tracking-wide font-mono"
+                                          onClick={() => {
+                                            setDetailOpen(false)
+                                            setDownloadDoc({
+                                              ...selectedDoc,
+                                              versionId: v.id
+                                            })
+                                            setDownloadOpen(true)
+                                          }}
+                                        >
+                                          Скачать
+                                        </DropdownMenuItem>
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   ) : (

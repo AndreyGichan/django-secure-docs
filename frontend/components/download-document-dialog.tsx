@@ -31,6 +31,7 @@ interface DownloadDocumentDialogProps {
     documentTitle: string
     documentId: string
     documentType: string
+    versionId?: number
 }
 
 export function DownloadDocumentDialog({
@@ -39,6 +40,7 @@ export function DownloadDocumentDialog({
     documentTitle,
     documentId,
     documentType,
+    versionId,
 }: DownloadDocumentDialogProps) {
     const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null)
     const [downloading, setDownloading] = useState(false)
@@ -75,7 +77,7 @@ export function DownloadDocumentDialog({
         setDownloadMode(mode)
         setDownloading(true)
         try {
-            const token = await createDownloadLink(documentId);
+            const token = await createDownloadLink(documentId, versionId);
             if (mode === "encrypted") {
                 await downloadEncrypted(token, documentTitle, documentType);
             } else if (mode === "decrypted") {

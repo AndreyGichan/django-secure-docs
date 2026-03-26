@@ -276,6 +276,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
         version_id = request.data.get("version_id")  
         if version_id:
             version = get_object_or_404(DocumentVersion, id=version_id, document=document)
+
+            if version.status != "approved" and document.owner != request.user:
+                return Response(
+                    {"detail": "Version is not approved"}, status=status.HTTP_403_FORBIDDEN
+                )
         else:
             # version = document.versions.filter(status="approved").order_by("-version_number").first()
             version = document.current_version
