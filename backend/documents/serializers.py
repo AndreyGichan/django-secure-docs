@@ -232,6 +232,7 @@ class ShareDocumentSerializer(serializers.Serializer):
                 "comment": comment,
             },
         )
+        
 
         log_action(
             user=owner,

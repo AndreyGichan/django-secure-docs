@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import {
     User,
     Mail,
@@ -39,38 +39,10 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog"
-import { updateUserPublicKey } from "@/lib/api/auth";
+import { updateUserPublicKey, getCurrentUser, changePassword } from "@/lib/api/auth";
+import { getUserStats } from "@/lib/api/stats"
 import { generateKeyPair, toPEM } from "@/lib/crypto/keys";
 
-
-const userProfile = {
-    name: "Admin User",
-    email: "admin@company.com",
-    department: "IT Security",
-    role: "Administrator",
-    joinDate: "January 15, 2024",
-    lastLogin: "February 24, 2026, 09:42",
-    documentsCreated: 156,
-    documentsShared: 89,
-    totalDownloads: 342,
-}
-
-const keyHistory = [
-    {
-        id: "key-001",
-        fingerprint: "SHA256:a4:d1:...:f8:3b",
-        algorithm: "RSA-4096",
-        createdAt: "January 15, 2024",
-        status: "active" as const,
-    },
-    {
-        id: "key-002",
-        fingerprint: "SHA256:7c:e2:...:91:4a",
-        algorithm: "RSA-2048",
-        createdAt: "March 8, 2023",
-        status: "revoked" as const,
-    },
-]
 
 export default function ProfilePage() {
     const [generateOpen, setGenerateOpen] = useState(false)
@@ -81,6 +53,72 @@ export default function ProfilePage() {
     const [downloaded, setDownloaded] = useState(false)
     const [showFingerprint, setShowFingerprint] = useState<Record<string, boolean>>({})
     const [generatedPrivateKey, setGeneratedPrivateKey] = useState<string | null>(null)
+    const [userProfile, setUserProfile] = useState<{
+        id: string
+        email: string
+        full_name: string
+        role: string
+        public_key?: string
+        date_joined: string
+        last_login: string
+    } | null>(null)
+    const [stats, setStats] = useState({
+        documents_created: 0,
+        documents_shared: 0,
+        documents_accessible: 0
+    })
+    const [oldPassword, setOldPassword] = useState("")
+    const [newPassword, setNewPassword] = useState("")
+    const [confirmPassword, setConfirmPassword] = useState("")
+    const [successMessage, setSuccessMessage] = useState<string | null>(null)
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const [showOldPassword, setShowOldPassword] = useState(false)
+    const [showNewPassword, setShowNewPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+
+    useEffect(() => {
+        const loadProfile = async () => {
+            try {
+                const res = await getCurrentUser()
+                setUserProfile(res.data)
+            } catch (error) {
+                console.error("Failed to load profile:", error)
+            }
+        }
+
+        loadProfile()
+    }, [])
+
+    useEffect(() => {
+        const loadStats = async () => {
+            try {
+                const res = await getUserStats()
+                setStats(res.data)
+            } catch (error) {
+                console.error("Failed to load stats:", error)
+            }
+        }
+
+        loadStats()
+    }, [])
+
+
+    const handleChangePassword = async () => {
+        try {
+            await changePassword(oldPassword, newPassword, confirmPassword)
+            setSuccessMessage("Пароль успешно обновлён")
+            setErrorMessage(null)
+            setOldPassword("")
+            setNewPassword("")
+            setConfirmPassword("")
+            setTimeout(() => setSuccessMessage(null), 3000)
+        } catch (err) {
+            setErrorMessage("Ошибка при смене пароля")
+            setSuccessMessage(null)
+            setTimeout(() => setErrorMessage(null), 3000)
+        }
+    }
 
 
     const handleGenerate = async () => {
@@ -133,10 +171,6 @@ export default function ProfilePage() {
         }
     }, [])
 
-    const toggleFingerprint = (id: string) => {
-        setShowFingerprint((prev) => ({ ...prev, [id]: !prev[id] }))
-    }
-
     return (
         <div className="flex flex-1 flex-col">
             <PageHeader
@@ -169,7 +203,12 @@ export default function ProfilePage() {
                                 <div className="relative">
                                     <Avatar className="h-20 w-20 border-4 border-card shadow-xl">
                                         <AvatarFallback className="bg-gradient-to-br from-violet-600 to-cyan-500 text-xl font-bold text-white">
-                                            AD
+                                            {userProfile?.full_name
+                                                ?.split(" ")
+                                                .map(n => n[0])
+                                                .join("")
+                                                .slice(0, 2)
+                                            }
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 border-2 border-card">
@@ -180,24 +219,22 @@ export default function ProfilePage() {
                                 {/* Name & meta */}
                                 <div className="flex-1 pt-2">
                                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                                        <h2 className="text-xl font-bold text-foreground">{userProfile.name}</h2>
+                                        <h2 className="text-xl tracking-wide font-mono text-foreground">{userProfile?.full_name}</h2>
                                         <Badge className="w-fit bg-violet-500/15 text-violet-400 border-violet-500/30 text-[10px] font-mono">
-                                            {userProfile.role}
+                                            {userProfile?.role}
                                         </Badge>
                                     </div>
                                     <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
                                         <span className="flex items-center gap-1.5">
                                             <Mail className="h-3 w-3 text-cyan-400" />
-                                            {userProfile.email}
-                                        </span>
-                                        <span className="flex items-center gap-1.5">
-                                            <Building2 className="h-3 w-3 text-amber-400" />
-                                            {userProfile.department}
+                                            {userProfile?.email}
                                         </span>
                                         <span className="flex items-center gap-1.5">
                                             <Calendar className="h-3 w-3 text-emerald-400" />
                                             {"Joined "}
-                                            {userProfile.joinDate}
+                                            {userProfile?.date_joined
+                                                ? new Date(userProfile.date_joined).toLocaleDateString()
+                                                : ""}
                                         </span>
                                     </div>
                                 </div>
@@ -206,10 +243,17 @@ export default function ProfilePage() {
                             {/* Quick stats */}
                             <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 {[
-                                    { label: "Documents", value: userProfile.documentsCreated, icon: FileText, color: "text-violet-400", bg: "bg-violet-500/10" },
-                                    { label: "Shared", value: userProfile.documentsShared, icon: Share2, color: "text-cyan-400", bg: "bg-cyan-500/10" },
-                                    { label: "Downloads", value: userProfile.totalDownloads, icon: Download, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-                                    { label: "Last Login", value: "09:42", icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10" },
+                                    { label: "Documents", value: stats.documents_created, icon: FileText, color: "text-violet-400", bg: "bg-violet-500/10" },
+                                    { label: "Shared", value: stats.documents_shared, icon: Share2, color: "text-cyan-400", bg: "bg-cyan-500/10" },
+                                    { label: "Access", value: stats.documents_accessible, icon: Lock, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+                                    {
+                                        label: "Last Login", value: userProfile?.last_login
+                                            ? new Date(userProfile.last_login).toLocaleTimeString()
+                                            : "-",
+                                        icon: Clock,
+                                        color: "text-amber-400",
+                                        bg: "bg-amber-500/10"
+                                    },
                                 ].map((stat) => (
                                     <div key={stat.label} className="flex items-center gap-3 rounded-xl bg-secondary/30 border border-border/40 px-4 py-3">
                                         <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${stat.bg}`}>
@@ -237,19 +281,27 @@ export default function ProfilePage() {
                                         <User className="h-4 w-4 text-violet-400" />
                                         Personal Information
                                     </h3>
-                                    <p className="text-[11px] text-muted-foreground mt-1">Account details and settings</p>
+                                    <p className="text-[11px] font-mono tracking-wide text-muted-foreground mt-1.5">Данные учетной записи</p>
                                 </div>
 
                                 <Separator className="bg-border/40" />
 
                                 <div className="flex flex-col gap-3.5">
                                     {[
-                                        { label: "Full Name", value: userProfile.name },
-                                        { label: "Email Address", value: userProfile.email },
-                                        { label: "Department", value: userProfile.department },
-                                        { label: "Role", value: userProfile.role },
-                                        { label: "Member Since", value: userProfile.joinDate },
-                                        { label: "Last Active", value: userProfile.lastLogin },
+                                        { label: "Full Name", value: userProfile?.full_name },
+                                        { label: "Email Address", value: userProfile?.email },
+                                        { label: "Role", value: userProfile?.role },
+                                        {
+                                            label: "Member Since", value: userProfile?.date_joined
+                                                ? new Date(userProfile.date_joined).toLocaleDateString()
+                                                : ""
+                                        },
+                                        {
+                                            label: "Last Active",
+                                            value: userProfile?.last_login
+                                                ? new Date(userProfile.last_login).toLocaleString()
+                                                : "-"
+                                        }
                                     ].map((item) => (
                                         <div key={item.label} className="flex flex-col gap-1">
                                             <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{item.label}</span>
@@ -262,19 +314,75 @@ export default function ProfilePage() {
 
                                 <div className="flex flex-col gap-3">
                                     <Label className="text-xs text-muted-foreground font-medium">Change Password</Label>
-                                    <Input
-                                        type="password"
-                                        placeholder="New password"
-                                        className="h-9 bg-secondary/50 border-border/70 text-foreground placeholder:text-muted-foreground/40 text-xs focus-visible:ring-violet-500/50"
-                                    />
-                                    <Input
-                                        type="password"
-                                        placeholder="Confirm new password"
-                                        className="h-9 bg-secondary/50 border-border/70 text-foreground placeholder:text-muted-foreground/40 text-xs focus-visible:ring-violet-500/50"
-                                    />
-                                    <Button variant="outline" size="sm" className="w-fit text-xs bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary">
-                                        Update Password
+                                    <div className="relative">
+                                        <Input
+                                            type={showOldPassword ? "text" : "password"}
+                                            placeholder="Текущий пароль"
+                                            value={oldPassword}
+                                            onChange={(e) => setOldPassword(e.target.value)}
+                                            className="h-9 bg-secondary/50 border-border/70 text-foreground placeholder:text-muted-foreground/40 text-xs font-mono focus-visible:ring-violet-500/50"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowOldPassword(!showOldPassword)}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        >
+                                            {showOldPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <Input
+                                            type={showNewPassword ? "text" : "password"}
+                                            placeholder="Новый пароль"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            className="h-9 bg-secondary/50 border-border/70 text-foreground placeholder:text-muted-foreground/40 text-xs font-mono focus-visible:ring-violet-500/50"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewPassword(!showNewPassword)}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        >
+                                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <Input
+                                            type={showConfirmPassword ? "text" : "password"}
+                                            placeholder="Подтвердить новый пароль"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            className="h-9 bg-secondary/50 border-border/70 text-foreground placeholder:text-muted-foreground/40 text-xs font-mono focus-visible:ring-violet-500/50"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        >
+                                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleChangePassword}
+                                        className="w-fit text-xs font-mono bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                                    >
+                                        Обновить пароль
                                     </Button>
+                                    {successMessage && (
+                                        <div className="mt-2 flex items-center gap-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-emerald-600 text-sm font-mono">
+                                            <Check className="h-4 w-4" />
+                                            {successMessage}
+                                        </div>
+                                    )}
+
+                                    {errorMessage && (
+                                        <div className="mt-2 flex items-center gap-2 rounded-md bg-red-500/10 border border-red-500/20 px-3 py-2 text-red-600 text-sm font-mono">
+                                            <AlertTriangle className="h-4 w-4" />
+                                            {errorMessage}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -291,7 +399,7 @@ export default function ProfilePage() {
                                             <KeyRound className="h-4 w-4 text-emerald-400" />
                                             Encryption Keys
                                         </h3>
-                                        <p className="text-[11px] text-muted-foreground mt-1">Manage your RSA key pairs for document encryption</p>
+                                        <p className="text-[11px] font-mono tracking-wide text-muted-foreground mt-1.5">Управляйте RSA ключами для шифрования документов</p>
                                     </div>
                                     <Button
                                         onClick={() => {
@@ -303,10 +411,10 @@ export default function ProfilePage() {
                                             setGenerateOpen(true)
                                         }}
                                         size="sm"
-                                        className="bg-gradient-to-r from-emerald-600 to-cyan-500 text-white hover:from-emerald-500 hover:to-cyan-400 border-0 text-xs font-semibold shadow-lg shadow-emerald-500/15"
+                                        className="bg-gradient-to-r from-emerald-600 to-cyan-500 text-white hover:from-emerald-500 hover:to-cyan-400 border-0 text-xs tracking-wide shadow-lg shadow-emerald-500/15"
                                     >
                                         <Plus className="mr-1.5 h-3 w-3" />
-                                        Generate New Pair
+                                        Создать новую пару
                                     </Button>
                                 </div>
 
@@ -317,14 +425,15 @@ export default function ProfilePage() {
                                     <Shield className="h-4 w-4 text-violet-400 shrink-0 mt-0.5" />
                                     <div className="flex flex-col gap-1">
                                         <span className="text-[11px] text-violet-400 font-medium">About Key Pairs</span>
-                                        <p className="text-[10px] text-muted-foreground leading-relaxed">
-                                            Your public key is stored on the server and used to encrypt documents. Your private key is stored only by you and is required to decrypt downloaded documents. The server never has access to your private key.
+                                        <p className="text-[11px] font-mono text-muted-foreground leading-relaxed">
+                                            Ваш открытый ключ хранится на сервере и используется для шифрования документов. Ваш закрытый ключ хранится только у вас и необходим для расшифровки загруженных документов. Сервер никогда не имеет доступа к вашему закрытому ключу.
                                         </p>
                                     </div>
                                 </div>
 
+
                                 {/* Key list */}
-                                <div className="flex flex-col gap-3">
+                                {/* <div className="flex flex-col gap-3">
                                     <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Key History</span>
 
                                     {keyHistory.map((key) => (
@@ -388,13 +497,13 @@ export default function ProfilePage() {
                                             </div>
                                         </div>
                                     ))}
-                                </div>
+                                </div> */}
 
                                 {/* Warning */}
                                 <div className="flex items-start gap-3 rounded-xl bg-amber-500/5 border border-amber-500/15 px-4 py-3">
                                     <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                                    <p className="text-[10px] text-amber-400/80 leading-relaxed">
-                                        Generating a new key pair will revoke the previous one. Documents encrypted with the old public key will still require the old private key to decrypt.
+                                    <p className="text-[11px] font-mono text-amber-400/80 leading-relaxed">
+                                        Генерация новой пары ключей аннулирует предыдущую. Для расшифровки документов, зашифрованных старым открытым ключом, по-прежнему потребуется старый закрытый ключ.
                                     </p>
                                 </div>
                             </div>

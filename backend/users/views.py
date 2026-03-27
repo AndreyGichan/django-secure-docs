@@ -9,6 +9,11 @@ from rest_framework.filters import SearchFilter
 from rest_framework.decorators import action
 from .models import User
 from .serializers import UserProfileSerializer
+from documents.models import Document, DocumentAccess
+from django.db.models import Q
+from django.utils import timezone
+from rest_framework.generics import UpdateAPIView
+from .serializers import ChangePasswordSerializer
 
 
 class LoginView(BaseLoginView):
@@ -88,3 +93,43 @@ class UserSearchView(ListAPIView):
 
     def get_queryset(self): # type: ignore
         return User.objects.exclude(id=self.request.user.pk)
+
+
+class UserStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        documents_created = Document.objects.filter(owner=user).count()
+        documents_shared_count = DocumentAccess.objects.filter(
+            document__owner=user,
+            revoked_at__isnull=True
+        ).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now())
+        ).exclude(
+            user=user  
+        ).count()
+        documents_accessible = DocumentAccess.objects.filter(
+            user=user,
+            revoked_at__isnull=True
+        ).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now())
+        ).count()
+
+        return Response({
+            "documents_created": documents_created,
+            "documents_shared": documents_shared_count,
+            "documents_accessible": documents_accessible,
+        })
+    
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"detail": "Пароль успешно обновлён"}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

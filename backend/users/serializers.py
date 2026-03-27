@@ -1,11 +1,12 @@
 from rest_framework import serializers
 from .models import User
 from dj_rest_auth.registration.serializers import RegisterSerializer
+from django.contrib.auth import password_validation
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "public_key"]
+        fields = ["id", "email", "full_name", "public_key", "role", "date_joined", "last_login"]
 
 
 class CustomRegisterSerializer(RegisterSerializer):
@@ -35,4 +36,28 @@ class CustomRegisterSerializer(RegisterSerializer):
         role='employee', 
         public_key=self.validated_data.get('public_key')  # type: ignore
         )
+        return user
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+    confirm_password = serializers.CharField(required=True)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Текущий пароль неверен")
+        return value
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": "Пароли не совпадают"})
+        password_validation.validate_password(attrs['new_password'], self.context['request'].user)
+        return attrs
+
+    def save(self, **kwargs):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password']) # type: ignore
+        user.save()
         return user

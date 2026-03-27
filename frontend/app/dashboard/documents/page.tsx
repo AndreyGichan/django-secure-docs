@@ -1321,25 +1321,6 @@ export default function DocumentsPage() {
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
 
-            {/* {Array.from({ length: totalPages }, (_, i) => {
-              const pageNumber = i + 1
-              const isActive = pageNumber === page
-
-              return (
-                <Button
-                  key={pageNumber}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(pageNumber)}
-                  className={`h-7 min-w-7 text-xs ${isActive
-                    ? "bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0"
-                    : "bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    }`}
-                >
-                  {pageNumber}
-                </Button>
-              )
-            })} */}
             {getPaginationPages(page, totalPages).map((p, idx) =>
               p === "..." ? (
                 <span key={idx} className="px-2 py-1 text-muted-foreground">…</span>

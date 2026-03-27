@@ -56,7 +56,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):  # type: ignore
         user = self.request.user
 
-        qs = Document.objects.filter(is_active=True).filter(
+        qs = Document.objects.filter(is_active=True).annotate(
+            shared_with_count=Count(
+                'access_list',
+                filter=Q(access_list__revoked_at__isnull=True) &
+                    (Q(access_list__expires_at__isnull=True) | Q(access_list__expires_at__gte=timezone.now()))
+            )
+        )
+
+        qs = qs.filter(
             Q(owner=user) |
             Q(access_list__user=user, access_list__revoked_at__isnull=True,
             access_list__expires_at__gte=timezone.now()) |
@@ -64,19 +72,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
             access_list__expires_at__isnull=True)
         ).distinct()
 
-        qs = qs.annotate(
-            shared_with_count=Count(
-                'access_list',
-                filter=Q(access_list__revoked_at__isnull=True)
-            )
-        )
-
-        # обработка сортировки
         ordering = self.request.GET.get("ordering")
         if ordering:
             qs = qs.order_by(ordering)
         else:
-            qs = qs.order_by("-updated_at")
+            qs = qs.order_by(
+                F('owner').desc(nulls_last=True), 
+                '-updated_at', 
+                '-shared_with_count'
+            )
 
         return qs
 
@@ -84,11 +88,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return DocumentCreateSerializer
         return DocumentSerializer
-
-    # def get_permissions(self):
-    #     if self.action in ["retrieve", "update", "partial_update", "destroy",  "upload_version"]:
-    #         return [IsAuthenticated(), IsOwnerOrHasAccess()]
-    #     return [IsAuthenticated()]
 
     def get_permissions(self):
         if self.action in ["retrieve", "update", "partial_update", "destroy"]:
