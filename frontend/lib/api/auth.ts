@@ -23,6 +23,6 @@ export const searchUsers = (query: string) =>
     params: { search: query },
   });
 export const updateUserPublicKey = (publicKey: string) =>
-  API.patch("users/me/", { public_key: publicKey })
+  API.patch("users/profile/", { public_key: publicKey })
 export const changePassword = (oldPassword: string, newPassword: string, confirmPassword: string) =>
   API.post("users/change-password/", { old_password: oldPassword, new_password: newPassword, confirm_password: confirmPassword });

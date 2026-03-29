@@ -152,7 +152,7 @@ export default function ProfilePage() {
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
         setDownloaded(true)
-    }, [])
+    }, [generatedPrivateKey])
 
     const handleCopyKey = useCallback(async () => {
         try {

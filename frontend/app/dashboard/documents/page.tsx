@@ -1331,8 +1331,8 @@ export default function DocumentsPage() {
                   variant={p === page ? "default" : "outline"}
                   onClick={() => setPage(p as number)}
                   className={`h-7 min-w-7 text-xs ${p === page
-                      ? "bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0"
-                      : "bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    ? "bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0"
+                    : "bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
                     }`}
                 >
                   {p}
@@ -1765,6 +1765,7 @@ export default function DocumentsPage() {
                     {(() => {
                       return versions.map((v) => {
                         const isCurrent = v.version_number === selectedDoc.version;
+                        const isSingleCurrent = versions.length === 1 && isCurrent;
 
                         return (
                           <div
@@ -1776,59 +1777,61 @@ export default function DocumentsPage() {
                               <span className="text-muted-foreground tracking-wide font-mono px-1">
                                 {getVersionLabel(v, isCurrent)}
                               </span>
-
                             </div>
+
                             <div className="flex items-center gap-2 justify-end w-[8rem]">
                               {currentUser?.email === selectedDoc?.owner_email ? (
                                 <>
-                                  {getVersionStatusBadge(v.status)}
-                                  {!isCurrent ? (
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <button className="text-muted-foreground hover:text-foreground">
-                                          <MoreHorizontal className="h-4 w-4" />
-                                        </button>
-                                      </DropdownMenuTrigger>
-
-                                      <DropdownMenuContent align="end">
-                                        {v.status === "pending" && (
-                                          <DropdownMenuItem
-                                            className="text-xs tracking-wide font-mono"
-                                            onClick={() => handleApproveVersion(v.id)}
-                                          >
-                                            Одобрить
-                                          </DropdownMenuItem>
-                                        )}
-
-                                        {v.status === "approved" && (
-                                          <DropdownMenuItem
-                                            className="text-xs tracking-wide font-mono"
-                                            onClick={() => handleSetCurrentVersion(v.id)}
-                                          >
-                                            Сделать текущей
-                                          </DropdownMenuItem>
-                                        )}
-                                        <DropdownMenuItem
-                                          className="text-xs tracking-wide font-mono"
-                                          onClick={() => {
-                                            setDetailOpen(false)
-                                            setDownloadDoc({
-                                              ...selectedDoc,
-                                              versionId: v.id
-                                            })
-                                            setDownloadOpen(true)
-                                          }}
-                                        >
-                                          Скачать
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
+                                  {isSingleCurrent ? (
+                                    <div className="ml-auto">{getVersionStatusBadge(v.status)}</div>
                                   ) : (
-                                    <div className="w-4 h-4" />
+                                    <>
+                                      {getVersionStatusBadge(v.status)}
+                                      {!isCurrent && (
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <button className="text-muted-foreground hover:text-foreground">
+                                              <MoreHorizontal className="h-4 w-4" />
+                                            </button>
+                                          </DropdownMenuTrigger>
+
+                                          <DropdownMenuContent align="end">
+                                            {v.status === "pending" && (
+                                              <DropdownMenuItem
+                                                className="text-xs tracking-wide font-mono"
+                                                onClick={() => handleApproveVersion(v.id)}
+                                              >
+                                                Одобрить
+                                              </DropdownMenuItem>
+                                            )}
+
+                                            {v.status === "approved" && (
+                                              <DropdownMenuItem
+                                                className="text-xs tracking-wide font-mono"
+                                                onClick={() => handleSetCurrentVersion(v.id)}
+                                              >
+                                                Сделать текущей
+                                              </DropdownMenuItem>
+                                            )}
+
+                                            <DropdownMenuItem
+                                              className="text-xs tracking-wide font-mono"
+                                              onClick={() => {
+                                                setDetailOpen(false)
+                                                setDownloadDoc({ ...selectedDoc, versionId: v.id })
+                                                setDownloadOpen(true)
+                                              }}
+                                            >
+                                              Скачать
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      )}
+                                    </>
                                   )}
                                 </>
                               ) : (
-                                getVersionStatusBadge(v.status)
+                                <div className="ml-auto">{getVersionStatusBadge(v.status)}</div>
                               )}
                             </div>
                           </div>
