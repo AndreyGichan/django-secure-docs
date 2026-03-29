@@ -514,7 +514,7 @@ export default function ProfilePage() {
 
             {/* ---- Generate Key Dialog ---- */}
             <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-                <DialogContent className="bg-card text-card-foreground border-border max-w-md p-0 gap-0 overflow-hidden">
+                <DialogContent className="bg-card text-card-foreground border-border max-w-[35rem] p-0 gap-0 overflow-hidden">
                     {/* Header */}
                     <div className="relative px-6 pt-6 pb-0">
                         <div className="absolute -top-20 left-1/2 -translate-x-1/2 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl" />
@@ -525,8 +525,8 @@ export default function ProfilePage() {
                                 </div>
                                 <div>
                                     <DialogTitle className="text-base font-bold text-foreground">Generate New Key Pair</DialogTitle>
-                                    <DialogDescription className="text-[11px] text-muted-foreground mt-0.5">
-                                        Create a new RSA-4096 key pair for document encryption
+                                    <DialogDescription className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                                        Создайте новую пару ключей RSA-2048 для шифрования документов
                                     </DialogDescription>
                                 </div>
                             </div>
@@ -542,31 +542,31 @@ export default function ProfilePage() {
                                         <Lock className="h-4 w-4 text-muted-foreground" />
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-[11px] text-foreground font-medium">Algorithm</span>
-                                            <span className="text-[10px] text-muted-foreground font-mono">RSA-4096 (OAEP + SHA-256)</span>
+                                            <span className="text-[10px] text-muted-foreground font-mono">RSA-2048 (OAEP + SHA-256)</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3 rounded-xl bg-secondary/30 border border-border/50 px-4 py-3">
                                         <Shield className="h-4 w-4 text-muted-foreground" />
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-[11px] text-foreground font-medium">Security Level</span>
-                                            <span className="text-[10px] text-muted-foreground">Military-grade encryption, 4096-bit key length</span>
+                                            <span className="text-[10px] font-mono text-muted-foreground">Надежное шифрование, длина ключа 2048 бит</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="flex items-start gap-3 rounded-xl bg-amber-500/5 border border-amber-500/15 px-4 py-3">
                                     <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                                    <p className="text-[10px] text-amber-400/80 leading-relaxed">
-                                        This will revoke your current active key pair. You will need the new private key to decrypt any future documents. Old documents still require the old key.
+                                    <p className="text-[10px] font-mono text-amber-400/80 leading-relaxed">
+                                        Это аннулирует вашу текущую активную пару ключей. Для расшифровки любых будущих документов вам потребуется новый закрытый ключ. Для расшифровки старых документов потребуется старый ключ.
                                     </p>
                                 </div>
 
                                 <Button
                                     onClick={handleGenerate}
-                                    className="h-10 w-full bg-gradient-to-r from-emerald-600 to-cyan-500 text-white hover:from-emerald-500 hover:to-cyan-400 border-0 text-sm font-semibold shadow-lg shadow-emerald-500/20"
+                                    className="h-10 w-full bg-gradient-to-r from-emerald-600 to-cyan-500 text-white hover:from-emerald-500 hover:to-cyan-400 border-0 text-sm shadow-lg shadow-emerald-500/20"
                                 >
-                                    <KeyRound className="mr-2 h-4 w-4" />
-                                    Generate Key Pair
+                                    <KeyRound className="h-4 w-4" />
+                                    Создать новую пару
                                 </Button>
                             </>
                         )}
@@ -581,8 +581,8 @@ export default function ProfilePage() {
                                     <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 opacity-20 blur-lg animate-pulse" />
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-sm font-semibold text-foreground">Generating RSA-4096 key pair...</p>
-                                    <p className="text-[11px] text-muted-foreground mt-1">This may take a few seconds</p>
+                                    <p className="text-sm font-semibold text-foreground">Генерация пары ключей RSA-2048...</p>
+                                    <p className="text-[11px] text-muted-foreground mt-1">Это может занять несколько секунд.</p>
                                 </div>
                                 <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
                                     <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 animate-[loading_2s_ease-in-out_infinite]"
@@ -602,12 +602,12 @@ export default function ProfilePage() {
                                     </div>
                                     <div>
                                         <span className="text-xs font-semibold text-emerald-400">Key pair generated successfully</span>
-                                        <p className="text-[10px] text-muted-foreground">Save your private key below</p>
+                                        <p className="text-[10px] font-mono text-muted-foreground">Сохраните свой приватный ключ ниже</p>
                                     </div>
                                 </div>
 
                                 {/* Key preview */}
-                                <div className="rounded-xl bg-background/80 border border-border/50 p-3 font-mono text-[10px] text-muted-foreground leading-relaxed max-h-[100px] overflow-y-auto">
+                                <div className="rounded-xl bg-background/80 border border-border/50 p-3 font-mono text-[12px] text-muted-foreground leading-relaxed max-h-[200px] overflow-y-auto">
                                     <pre className="whitespace-pre-wrap break-all">{generatedPrivateKey}</pre>
                                 </div>
 
@@ -615,30 +615,30 @@ export default function ProfilePage() {
                                 <div className="flex gap-3">
                                     <Button
                                         onClick={handleDownloadKey}
-                                        className={`flex-1 h-9 text-xs font-semibold transition-all duration-300 ${downloaded
+                                        className={`flex-1 h-9 text-xs font-semibold font-mono tracking-wide transition-all duration-300 ${downloaded
                                             ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
                                             : "bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:from-violet-500 hover:to-cyan-400 border-0 shadow-lg shadow-violet-500/20"
                                             }`}
                                         variant={downloaded ? "outline" : "default"}
                                     >
                                         {downloaded ? (
-                                            <><Check className="mr-1.5 h-3 w-3" /> Downloaded</>
+                                            <><Check className="h-3 w-3" /> Скачано</>
                                         ) : (
-                                            <><Download className="mr-1.5 h-3 w-3" /> Download .pem</>
+                                            <><Download className="h-3 w-3" /> Скачать .pem</>
                                         )}
                                     </Button>
                                     <Button
                                         onClick={handleCopyKey}
                                         variant="outline"
-                                        className={`flex-1 h-9 text-xs font-semibold border-border transition-all duration-300 ${copied
+                                        className={`flex-1 h-9 text-xs font-semibold font-mono tracking-wide border-border transition-all duration-300 ${copied
                                             ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
                                             : "bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary"
                                             }`}
                                     >
                                         {copied ? (
-                                            <><Check className="mr-1.5 h-3 w-3" /> Copied</>
+                                            <><Check className="h-3 w-3" /> Скопировано</>
                                         ) : (
-                                            <><Copy className="mr-1.5 h-3 w-3" /> Copy</>
+                                            <><Copy className="h-3 w-3" /> Скопировать</>
                                         )}
                                     </Button>
                                 </div>
@@ -646,8 +646,8 @@ export default function ProfilePage() {
                                 {/* Warning */}
                                 <div className="flex items-start gap-3 rounded-xl bg-amber-500/5 border border-amber-500/15 px-4 py-3">
                                     <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                                    <p className="text-[10px] text-amber-400/80 leading-relaxed">
-                                        If you lose your private key, it will be impossible to restore access to previously uploaded documents.
+                                    <p className="text-[10px] text-amber-400/80 leading-relaxed font-mono">
+                                       При потере приватного ключа восстановить доступ к ранее загруженным документам будет невозможно.
                                     </p>
                                 </div>
 
@@ -659,18 +659,18 @@ export default function ProfilePage() {
                                         onCheckedChange={(v) => setKeySaved(v === true)}
                                         className="border-border data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
                                     />
-                                    <label htmlFor="key-saved-profile" className="text-xs text-foreground cursor-pointer font-medium">
-                                        I have saved the key in a secure location
+                                    <label htmlFor="key-saved-profile" className="text-xs text-foreground cursor-pointer font-medium font-mono ">
+                                        Я сохранил ключ в безопасном месте
                                     </label>
                                 </div>
 
                                 <Button
                                     onClick={() => setGenerateOpen(false)}
                                     disabled={!keySaved}
-                                    className="h-10 w-full bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:from-violet-500 hover:to-cyan-400 border-0 text-sm font-semibold shadow-lg shadow-violet-500/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                                    className="h-10 w-full bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:from-violet-500 hover:to-cyan-400 border-0 text-sm font-semibold tracking-wide shadow-lg shadow-violet-500/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                                 >
-                                    <ShieldCheck className="mr-2 h-4 w-4" />
-                                    Confirm and Close
+                                    <ShieldCheck className="h-4 w-4" />
+                                    Продолжить
                                 </Button>
                             </>
                         )}

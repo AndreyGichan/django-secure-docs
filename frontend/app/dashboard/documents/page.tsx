@@ -781,7 +781,7 @@ export default function DocumentsPage() {
 
       <div className="flex-1 overflow-auto p-6">
         {/* Filters */}
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 max-w-7xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -1007,7 +1007,7 @@ export default function DocumentsPage() {
         </div>
 
         {/* Table */}
-        <div className="relative rounded-2xl border border-border/50 bg-card overflow-hidden">
+        <div className="relative rounded-2xl max-w-7xl mx-auto border border-border/50 bg-card overflow-hidden">
 
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 backdrop-blur-sm">
@@ -1300,7 +1300,7 @@ export default function DocumentsPage() {
 
 
         {/* Pagination */}
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 max-w-7xl mx-auto flex items-center justify-between">
           <span className="text-xs text-muted-foreground tracking-wide">
             {"Показано "}
             <span className="font-mono text-foreground">{documents.length}</span>
