@@ -10,6 +10,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q
 from .utils.file_format import build_encrypted_file_with_header
+from config.supabase_utils import upload_to_supabase
 
 User = get_user_model()
 
@@ -118,11 +119,13 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         encrypted_file_name = f"{file.name}.enc"
         original_bytes = file.read()
         final_bytes = build_encrypted_file_with_header(original_bytes, document.id)
-        encrypted_file = ContentFile(final_bytes, name=encrypted_file_name)
+        # encrypted_file = ContentFile(final_bytes, name=encrypted_file_name)
+        file_url = upload_to_supabase(final_bytes, file.name, folder=f"documents")
 
         version = DocumentVersion.objects.create(
             document=document,
-            file=encrypted_file,
+            # file=encrypted_file,
+            file=file_url,
             version_number=1,
             uploaded_by=user,
         )
@@ -168,6 +171,8 @@ class DocumentVersionSerializer(serializers.ModelSerializer):
 
 
 class DocumentVersionCreateSerializer(serializers.ModelSerializer):
+    file = serializers.FileField()
+    
     class Meta:
         model = DocumentVersion
         fields = ["file"]

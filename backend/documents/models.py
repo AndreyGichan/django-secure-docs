@@ -41,7 +41,8 @@ class DocumentVersion(models.Model):
         on_delete=models.CASCADE
     )
 
-    file = models.FileField(upload_to='documents/')
+    # file = models.FileField(upload_to='documents/')
+    file = models.URLField(max_length=1024)
     version_number = models.PositiveIntegerField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='approved')
 

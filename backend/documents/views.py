@@ -1,4 +1,5 @@
 import base64
+import requests
 from rest_framework import viewsets, status, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
@@ -11,6 +12,7 @@ from django.db import models
 from django.http import FileResponse
 from django.core.files.base import ContentFile
 from django.db.models import Count, Q, F
+from django.http import HttpResponseRedirect, HttpResponse
 
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 from .serializers import (
@@ -28,6 +30,7 @@ from audit.utils.request import get_client_ip
 from .utils.filter import DocumentFilter
 from .utils.pagination import DocumentLimitOffsetPagination
 from .utils.file_format import build_encrypted_file_with_header
+from config.supabase_utils import upload_to_supabase
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -128,13 +131,12 @@ class DocumentViewSet(viewsets.ModelViewSet):
             encrypted_file_name = f"{file.name}.enc"
 
             original_bytes = file.read()
-
             final_bytes = build_encrypted_file_with_header(
                 original_bytes,
                 document.id
             )
-
-            encrypted_file = ContentFile(final_bytes, name=encrypted_file_name)
+            file_url = upload_to_supabase(final_bytes, file.name, folder=f"documents")
+            # encrypted_file = ContentFile(final_bytes, name=encrypted_file_name)
 
             last_version = document.versions.order_by("-version_number").first()
             new_version_number = last_version.version_number + 1 if last_version else 1
@@ -143,7 +145,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
             version = DocumentVersion.objects.create(
                 document=document,
-                file=encrypted_file,
+                # file=encrypted_file,
+                file=file_url,
                 version_number=new_version_number,
                 uploaded_by=user,
                 status=version_status,
@@ -196,7 +199,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         #     revoked_at__isnull=True
         # ).exists():
         #     return Response({"detail": "No edit permission"}, status=status.HTTP_403_FORBIDDEN)
-
+        print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(
@@ -350,7 +353,18 @@ class DocumentViewSet(viewsets.ModelViewSet):
             ip_address=get_client_ip(request),
         )
 
-        return FileResponse(file.open("rb"), as_attachment=True)
+        # return FileResponse(file.open("rb"), as_attachment=True)
+        file_url = link.document_version.file
+        resp = requests.get(file_url)
+        if resp.status_code != 200:
+            return Response({"detail": "File not found"}, status=404)
+
+        file_bytes = resp.content
+        file_name = f"{document.title}.enc"  
+
+        response = HttpResponse(file_bytes, content_type="application/octet-stream")
+        response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        return response
 
     @action(
         detail=True,
