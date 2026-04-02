@@ -10,8 +10,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Bell, Search } from "lucide-react"
+import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { NotificationsPopover } from "@/components/notifications-popover"
 
 interface PageHeaderProps {
   title: string
@@ -54,10 +55,7 @@ export function PageHeader({ title, breadcrumbs, children }: PageHeaderProps) {
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary relative">
           <Search className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
-        </Button>
+        <NotificationsPopover />
       </div>
     </header>
   )

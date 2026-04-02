@@ -105,6 +105,7 @@ INSTALLED_APPS = [
     'documents',
     'audit',
     'reports',
+    'notifications',
     'corsheaders',
     'django_filters',
 ]
