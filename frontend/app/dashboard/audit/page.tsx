@@ -45,21 +45,6 @@ interface AuditEntry {
   ipAddress: string
 }
 
-// const auditLogs: AuditEntry[] = [
-//   { id: "1", user: "Ivanov I.", email: "ivanov@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-001", targetName: "Q4_Report.pdf", timestamp: "2026-02-16 14:32:05", ipAddress: "192.168.1.45" },
-//   { id: "2", user: "Petrova A.", email: "petrova@company.com", action: "SHARE", targetType: "Document", targetId: "doc-002", targetName: "Budget_2026.xlsx", timestamp: "2026-02-16 14:28:12", ipAddress: "192.168.1.78" },
-//   { id: "3", user: "Sidorov K.", email: "sidorov@company.com", action: "CREATE", targetType: "Document", targetId: "doc-003", targetName: "Proposal_v3.docx", timestamp: "2026-02-16 14:15:33", ipAddress: "192.168.1.22" },
-//   { id: "4", user: "Kozlova M.", email: "kozlova@company.com", action: "UPDATE", targetType: "Document", targetId: "doc-004", targetName: "NDA_Template.pdf", timestamp: "2026-02-16 13:45:18", ipAddress: "192.168.1.91" },
-//   { id: "5", user: "Novikov D.", email: "novikov@company.com", action: "DELETE", targetType: "Document", targetId: "doc-005", targetName: "Old_Invoice.pdf", timestamp: "2026-02-16 13:30:42", ipAddress: "10.0.0.15" },
-//   { id: "6", user: "Admin", email: "admin@company.com", action: "LOGIN", targetType: "System", targetId: "session-101", targetName: "Admin Session", timestamp: "2026-02-16 13:00:00", ipAddress: "10.0.0.1" },
-//   { id: "7", user: "Ivanov I.", email: "ivanov@company.com", action: "SHARE", targetType: "Document", targetId: "doc-006", targetName: "Architecture.png", timestamp: "2026-02-16 12:45:19", ipAddress: "192.168.1.45" },
-//   { id: "8", user: "Petrova A.", email: "petrova@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-007", targetName: "Security_Audit.pdf", timestamp: "2026-02-16 12:30:55", ipAddress: "192.168.1.78" },
-//   { id: "9", user: "Sidorov K.", email: "sidorov@company.com", action: "UPDATE", targetType: "Document", targetId: "doc-008", targetName: "Employee_Handbook.pdf", timestamp: "2026-02-16 11:20:08", ipAddress: "192.168.1.22" },
-//   { id: "10", user: "Kozlova M.", email: "kozlova@company.com", action: "CREATE", targetType: "Document", targetId: "doc-009", targetName: "API_Docs_v2.docx", timestamp: "2026-02-16 10:55:41", ipAddress: "192.168.1.91" },
-//   { id: "11", user: "Novikov D.", email: "novikov@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-010", targetName: "Invoice_Dec.xlsx", timestamp: "2026-02-16 10:10:22", ipAddress: "10.0.0.15" },
-//   { id: "12", user: "Ivanov I.", email: "ivanov@company.com", action: "LOGIN", targetType: "System", targetId: "session-102", targetName: "User Session", timestamp: "2026-02-16 09:00:00", ipAddress: "192.168.1.45" },
-// ]
-
 function getActionBadge(action: string) {
   const styles: Record<string, string> = {
     CREATE: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
@@ -92,13 +77,16 @@ export default function AuditPage() {
   const [search, setSearch] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
   const [logs, setLogs] = useState<AuditEntry[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [totalCount, setTotalCount] = useState(0)
 
   useEffect(() => {
     loadLogs()
-  }, [])
+  }, [page])
 
   const loadLogs = async () => {
-    const { data } = await getAuditLogs()
+    const { data } = await getAuditLogs({ limit: pageSize, offset: (page - 1) * pageSize })
 
     const mapped: AuditEntry[] = data.results.map((log: any) => ({
       id: log.id,
@@ -113,6 +101,7 @@ export default function AuditPage() {
     }))
 
     setLogs(mapped)
+    setTotalCount(data.count)
   }
 
   const filtered = logs.filter((log) => {
@@ -124,20 +113,36 @@ export default function AuditPage() {
     return matchSearch && matchAction
   })
 
+  function getPaginationPages(currentPage: number, totalPages: number, maxVisible = 3): (number | "...")[] {
+    const pages: (number | "...")[] = []
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+      return pages
+    }
+
+    const half = Math.floor(maxVisible / 2)
+    let start = Math.max(2, currentPage - half)
+    let end = Math.min(totalPages - 1, currentPage + half)
+
+    if (currentPage - 1 <= half) start = 2
+    if (totalPages - currentPage <= half) end = totalPages - 1
+
+    pages.push(1)
+    if (start > 2) pages.push("...")
+    for (let i = start; i <= end; i++) pages.push(i)
+    if (end < totalPages - 1) pages.push("...")
+    pages.push(totalPages)
+
+    return pages
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
         title="Audit Log"
         breadcrumbs={[{ label: "Audit Log" }]}
       >
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 text-xs bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-        >
-          <Download className="mr-2 h-3 w-3" />
-          Export
-        </Button>
       </PageHeader>
 
       <div className="flex-1 overflow-auto p-6">
@@ -267,14 +272,41 @@ export default function AuditPage() {
             <span className="font-mono text-foreground">{logs.length}</span>
             {" событий"}
           </span>
+
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary" disabled>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+            >
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="sm" className="h-7 min-w-7 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0 text-xs">
-              1
-            </Button>
-            <Button variant="outline" size="icon" className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary" disabled>
+
+            {getPaginationPages(page, Math.ceil(totalCount / pageSize)).map((p, idx) =>
+              p === "..." ? (
+                <span key={idx} className="px-2 text-xs">...</span>
+              ) : (
+                <Button
+                  key={idx}
+                  variant={p === page ? "default" : "outline"}
+                  size="sm"
+                  className={`h-7 min-w-7 text-xs ${p === page ? "bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0" : "bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                  onClick={() => setPage(p as number)}
+                >
+                  {p}
+                </Button>
+              )
+            )}
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+              disabled={page === Math.ceil(totalCount / pageSize)}
+              onClick={() => setPage(page + 1)}
+            >
               <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
