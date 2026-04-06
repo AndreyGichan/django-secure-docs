@@ -107,7 +107,7 @@ export default function AuditPage() {
       action: log.action,
       targetType: log.target_type || "",
       targetId: log.target_id || "",
-      targetName: log.target_type || "",
+      targetName: log.target_name || "",
       timestamp: log.timestamp,
       ipAddress: log.ip_address || "",
     }))
@@ -260,12 +260,12 @@ export default function AuditPage() {
 
         {/* Pagination */}
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {"Showing "}
+          <span className="text-xs text-muted-foreground tracking-wide">
+            {"Показано "}
             <span className="font-mono text-foreground">{filtered.length}</span>
-            {" of "}
+            {" из "}
             <span className="font-mono text-foreground">{logs.length}</span>
-            {" events"}
+            {" событий"}
           </span>
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" className="h-7 w-7 bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary" disabled>

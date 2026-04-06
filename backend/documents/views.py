@@ -184,7 +184,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
                         last_version.version_number if last_version else None
                     )
                 },
-                new_data={"new_version": new_version_number, "status": version_status},
+                new_data={"new_version": new_version_number, "status": version_status, "name": f"v{new_version_number} ({document.title}.{document.type})",},
                 ip_address=get_client_ip(request),
             )
 
@@ -238,7 +238,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             target_type="DocumentVersion",
             target_id=version.id,
             old_data={"status": old_status},
-            new_data={"status": "approved"},
+            new_data={"status": "approved", "name": f"v{version.version_number} ({document.title}.{document.type})"},
             ip_address=get_client_ip(request),
         )
 
@@ -270,6 +270,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 new_data={
                     "shared_with": str(serializer.validated_data["user_id"]),
                     "role": serializer.validated_data["role"],
+                    "name": f"{document.title}.{document.type}"
                 },
                 ip_address=get_client_ip(request),
             )
@@ -319,6 +320,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             new_data={
                 "document_version_id": str(version.id),
                 "expires_at": str(link.expires_at),
+                "name": f"{document.title}.{document.type}"
             },
             ip_address=get_client_ip(request),
         )
@@ -349,7 +351,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             target_type="DocumentVersion",
             target_id=link.document_version.id,
             old_data=None,
-            new_data={"link_token": str(token)},
+            new_data={"link_token": str(token), "name": f"{document.title}.{document.type}"},
             ip_address=get_client_ip(request),
         )
 
@@ -508,7 +510,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 "title": document.title,
                 "status": document.status
             },
-            new_data=None,
+            new_data={"name": f"{document.title}.{document.type}"},
             ip_address=get_client_ip(request),
         )
 

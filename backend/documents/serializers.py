@@ -144,7 +144,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             target_type="Document",
             target_id=document.id,
             old_data=None,
-            new_data={"title": document.title, "description": document.description},
+            new_data={"title": document.title, "description": document.description, "name": f"{document.title}.{document.type}"},
             ip_address=get_client_ip(self.context["request"]),
         )
 
@@ -249,6 +249,7 @@ class ShareDocumentSerializer(serializers.Serializer):
                 "shared_with": str(new_user.id),  # type: ignore
                 "role": validated_data["role"],
                 "expires_at": str(expires_at) if expires_at else "unlimited",
+                "name": f"{document.title}.{document.type}"
             },
             ip_address=get_client_ip(self.context["request"]),
         )
