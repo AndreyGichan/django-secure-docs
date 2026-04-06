@@ -52,9 +52,9 @@ export function PageHeader({ title, breadcrumbs, children }: PageHeaderProps) {
       </Breadcrumb>
       <div className="ml-auto flex items-center gap-2">
         {children}
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary relative">
+        {/* <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary relative">
           <Search className="h-4 w-4" />
-        </Button>
+        </Button> */}
         <NotificationsPopover />
       </div>
     </header>

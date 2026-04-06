@@ -496,3 +496,23 @@ class DocumentViewSet(viewsets.ModelViewSet):
         })
 
 
+    def destroy(self, request, *args, **kwargs):
+        document = self.get_object()
+
+        log_action(
+            user=request.user,
+            action=AuditAction.DELETE,
+            target_type="Document",
+            target_id=document.id,
+            old_data={
+                "title": document.title,
+                "status": document.status
+            },
+            new_data=None,
+            ip_address=get_client_ip(request),
+        )
+
+        document.is_active = False
+        document.save()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

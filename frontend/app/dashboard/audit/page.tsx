@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Search,
   Filter,
@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { getAuditLogs } from "@/lib/api/audit"
 
 interface AuditEntry {
   id: string
@@ -44,20 +45,20 @@ interface AuditEntry {
   ipAddress: string
 }
 
-const auditLogs: AuditEntry[] = [
-  { id: "1", user: "Ivanov I.", email: "ivanov@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-001", targetName: "Q4_Report.pdf", timestamp: "2026-02-16 14:32:05", ipAddress: "192.168.1.45" },
-  { id: "2", user: "Petrova A.", email: "petrova@company.com", action: "SHARE", targetType: "Document", targetId: "doc-002", targetName: "Budget_2026.xlsx", timestamp: "2026-02-16 14:28:12", ipAddress: "192.168.1.78" },
-  { id: "3", user: "Sidorov K.", email: "sidorov@company.com", action: "CREATE", targetType: "Document", targetId: "doc-003", targetName: "Proposal_v3.docx", timestamp: "2026-02-16 14:15:33", ipAddress: "192.168.1.22" },
-  { id: "4", user: "Kozlova M.", email: "kozlova@company.com", action: "UPDATE", targetType: "Document", targetId: "doc-004", targetName: "NDA_Template.pdf", timestamp: "2026-02-16 13:45:18", ipAddress: "192.168.1.91" },
-  { id: "5", user: "Novikov D.", email: "novikov@company.com", action: "DELETE", targetType: "Document", targetId: "doc-005", targetName: "Old_Invoice.pdf", timestamp: "2026-02-16 13:30:42", ipAddress: "10.0.0.15" },
-  { id: "6", user: "Admin", email: "admin@company.com", action: "LOGIN", targetType: "System", targetId: "session-101", targetName: "Admin Session", timestamp: "2026-02-16 13:00:00", ipAddress: "10.0.0.1" },
-  { id: "7", user: "Ivanov I.", email: "ivanov@company.com", action: "SHARE", targetType: "Document", targetId: "doc-006", targetName: "Architecture.png", timestamp: "2026-02-16 12:45:19", ipAddress: "192.168.1.45" },
-  { id: "8", user: "Petrova A.", email: "petrova@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-007", targetName: "Security_Audit.pdf", timestamp: "2026-02-16 12:30:55", ipAddress: "192.168.1.78" },
-  { id: "9", user: "Sidorov K.", email: "sidorov@company.com", action: "UPDATE", targetType: "Document", targetId: "doc-008", targetName: "Employee_Handbook.pdf", timestamp: "2026-02-16 11:20:08", ipAddress: "192.168.1.22" },
-  { id: "10", user: "Kozlova M.", email: "kozlova@company.com", action: "CREATE", targetType: "Document", targetId: "doc-009", targetName: "API_Docs_v2.docx", timestamp: "2026-02-16 10:55:41", ipAddress: "192.168.1.91" },
-  { id: "11", user: "Novikov D.", email: "novikov@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-010", targetName: "Invoice_Dec.xlsx", timestamp: "2026-02-16 10:10:22", ipAddress: "10.0.0.15" },
-  { id: "12", user: "Ivanov I.", email: "ivanov@company.com", action: "LOGIN", targetType: "System", targetId: "session-102", targetName: "User Session", timestamp: "2026-02-16 09:00:00", ipAddress: "192.168.1.45" },
-]
+// const auditLogs: AuditEntry[] = [
+//   { id: "1", user: "Ivanov I.", email: "ivanov@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-001", targetName: "Q4_Report.pdf", timestamp: "2026-02-16 14:32:05", ipAddress: "192.168.1.45" },
+//   { id: "2", user: "Petrova A.", email: "petrova@company.com", action: "SHARE", targetType: "Document", targetId: "doc-002", targetName: "Budget_2026.xlsx", timestamp: "2026-02-16 14:28:12", ipAddress: "192.168.1.78" },
+//   { id: "3", user: "Sidorov K.", email: "sidorov@company.com", action: "CREATE", targetType: "Document", targetId: "doc-003", targetName: "Proposal_v3.docx", timestamp: "2026-02-16 14:15:33", ipAddress: "192.168.1.22" },
+//   { id: "4", user: "Kozlova M.", email: "kozlova@company.com", action: "UPDATE", targetType: "Document", targetId: "doc-004", targetName: "NDA_Template.pdf", timestamp: "2026-02-16 13:45:18", ipAddress: "192.168.1.91" },
+//   { id: "5", user: "Novikov D.", email: "novikov@company.com", action: "DELETE", targetType: "Document", targetId: "doc-005", targetName: "Old_Invoice.pdf", timestamp: "2026-02-16 13:30:42", ipAddress: "10.0.0.15" },
+//   { id: "6", user: "Admin", email: "admin@company.com", action: "LOGIN", targetType: "System", targetId: "session-101", targetName: "Admin Session", timestamp: "2026-02-16 13:00:00", ipAddress: "10.0.0.1" },
+//   { id: "7", user: "Ivanov I.", email: "ivanov@company.com", action: "SHARE", targetType: "Document", targetId: "doc-006", targetName: "Architecture.png", timestamp: "2026-02-16 12:45:19", ipAddress: "192.168.1.45" },
+//   { id: "8", user: "Petrova A.", email: "petrova@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-007", targetName: "Security_Audit.pdf", timestamp: "2026-02-16 12:30:55", ipAddress: "192.168.1.78" },
+//   { id: "9", user: "Sidorov K.", email: "sidorov@company.com", action: "UPDATE", targetType: "Document", targetId: "doc-008", targetName: "Employee_Handbook.pdf", timestamp: "2026-02-16 11:20:08", ipAddress: "192.168.1.22" },
+//   { id: "10", user: "Kozlova M.", email: "kozlova@company.com", action: "CREATE", targetType: "Document", targetId: "doc-009", targetName: "API_Docs_v2.docx", timestamp: "2026-02-16 10:55:41", ipAddress: "192.168.1.91" },
+//   { id: "11", user: "Novikov D.", email: "novikov@company.com", action: "DOWNLOAD", targetType: "Document", targetId: "doc-010", targetName: "Invoice_Dec.xlsx", timestamp: "2026-02-16 10:10:22", ipAddress: "10.0.0.15" },
+//   { id: "12", user: "Ivanov I.", email: "ivanov@company.com", action: "LOGIN", targetType: "System", targetId: "session-102", targetName: "User Session", timestamp: "2026-02-16 09:00:00", ipAddress: "192.168.1.45" },
+// ]
 
 function getActionBadge(action: string) {
   const styles: Record<string, string> = {
@@ -90,8 +91,31 @@ function getActionBadge(action: string) {
 export default function AuditPage() {
   const [search, setSearch] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
+  const [logs, setLogs] = useState<AuditEntry[]>([])
 
-  const filtered = auditLogs.filter((log) => {
+  useEffect(() => {
+    loadLogs()
+  }, [])
+
+  const loadLogs = async () => {
+    const { data } = await getAuditLogs()
+
+    const mapped: AuditEntry[] = data.results.map((log: any) => ({
+      id: log.id,
+      user: log.user_name || "Unknown",
+      email: log.user_email || "",
+      action: log.action,
+      targetType: log.target_type || "",
+      targetId: log.target_id || "",
+      targetName: log.target_type || "",
+      timestamp: log.timestamp,
+      ipAddress: log.ip_address || "",
+    }))
+
+    setLogs(mapped)
+  }
+
+  const filtered = logs.filter((log) => {
     const matchSearch =
       log.user.toLowerCase().includes(search.toLowerCase()) ||
       log.targetName.toLowerCase().includes(search.toLowerCase()) ||
@@ -159,16 +183,15 @@ export default function AuditPage() {
         {/* Summary badges */}
         <div className="mb-4 flex flex-wrap gap-2">
           {["CREATE", "UPDATE", "DELETE", "DOWNLOAD", "SHARE", "LOGIN"].map((action) => {
-            const count = auditLogs.filter((l) => l.action === action).length
+            const count = logs.filter((l) => l.action === action).length
             return (
               <button
                 key={action}
                 onClick={() => setActionFilter(actionFilter === action ? "all" : action)}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-mono transition-colors ${
-                  actionFilter === action
-                    ? "border-[hsl(var(--gradient-from))]/50 bg-[hsl(var(--gradient-from))]/10 text-foreground"
-                    : "border-border/50 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                }`}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-mono transition-colors ${actionFilter === action
+                  ? "border-[hsl(var(--gradient-from))]/50 bg-[hsl(var(--gradient-from))]/10 text-foreground"
+                  : "border-border/50 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  }`}
               >
                 {action}
                 <span className="rounded bg-secondary/50 px-1.5 py-0.5 text-[9px]">{count}</span>
@@ -198,7 +221,13 @@ export default function AuditPage() {
               {filtered.map((log) => (
                 <TableRow key={log.id} className="border-border/30 hover:bg-secondary/30">
                   <TableCell className="font-mono text-[11px] text-muted-foreground">
-                    {log.timestamp}
+                    {new Date(log.timestamp).toLocaleString("ru-RU", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2.5">
@@ -235,7 +264,7 @@ export default function AuditPage() {
             {"Showing "}
             <span className="font-mono text-foreground">{filtered.length}</span>
             {" of "}
-            <span className="font-mono text-foreground">{auditLogs.length}</span>
+            <span className="font-mono text-foreground">{logs.length}</span>
             {" events"}
           </span>
           <div className="flex items-center gap-1">

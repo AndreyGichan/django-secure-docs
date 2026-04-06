@@ -1,10 +1,5 @@
 import { API } from "./index";
 
-interface LoginData {
-  email: string;
-  password: string;
-}
-
 interface RegisterData {
   full_name: string;
   email: string;

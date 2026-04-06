@@ -14,6 +14,9 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.generics import UpdateAPIView
 from .serializers import ChangePasswordSerializer
+from audit.utils.audit import log_action
+from audit.models import AuditAction
+from audit.utils.request import get_client_ip
 
 
 class LoginView(BaseLoginView):
@@ -46,11 +49,29 @@ class LoginView(BaseLoginView):
             )
             response.data.pop("refresh", None)
 
+        if request.user and request.user.is_authenticated:
+            log_action(
+                user=request.user,
+                action=AuditAction.LOGIN,
+                target_type="User",
+                target_id=request.user.id,
+                ip_address=get_client_ip(request),
+            )
+
         return response
 
 
 class LogoutView(BaseLogoutView):
     def post(self, request, *args, **kwargs):
+        if request.user and request.user.is_authenticated:
+            log_action(
+                user=request.user,
+                action=AuditAction.LOGOUT,
+                target_type="User",
+                target_id=request.user.id,
+                ip_address=get_client_ip(request),
+            )
+
         response = super().post(request, *args, **kwargs)
         response.delete_cookie("access_token", path="/")
         response.delete_cookie("refresh_token", path="/token/refresh/")
@@ -72,12 +93,14 @@ class UserProfileView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     # @action(detail=False, methods=['patch'], permission_classes=[IsAuthenticated])
     def patch(self, request):
         public_key = request.data.get("public_key")
         if not public_key:
-            return Response({"error": "public_key is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "public_key is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
         request.user.public_key = public_key
         request.user.save()
         return Response({"public_key": public_key}, status=status.HTTP_200_OK)
@@ -91,7 +114,7 @@ class UserSearchView(ListAPIView):
 
     queryset = User.objects.all()
 
-    def get_queryset(self): # type: ignore
+    def get_queryset(self):  # type: ignore
         return User.objects.exclude(id=self.request.user.pk)
 
 
@@ -102,34 +125,37 @@ class UserStatsView(APIView):
         user = request.user
 
         documents_created = Document.objects.filter(owner=user).count()
-        documents_shared_count = DocumentAccess.objects.filter(
-            document__owner=user,
-            revoked_at__isnull=True
-        ).filter(
-            Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now())
-        ).exclude(
-            user=user  
-        ).count()
-        documents_accessible = DocumentAccess.objects.filter(
-            user=user,
-            revoked_at__isnull=True
-        ).filter(
-            Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now())
-        ).count()
+        documents_shared_count = (
+            DocumentAccess.objects.filter(document__owner=user, revoked_at__isnull=True)
+            .filter(Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now()))
+            .exclude(user=user)
+            .count()
+        )
+        documents_accessible = (
+            DocumentAccess.objects.filter(user=user, revoked_at__isnull=True)
+            .filter(Q(expires_at__isnull=True) | Q(expires_at__gte=timezone.now()))
+            .count()
+        )
 
-        return Response({
-            "documents_created": documents_created,
-            "documents_shared": documents_shared_count,
-            "documents_accessible": documents_accessible,
-        })
-    
+        return Response(
+            {
+                "documents_created": documents_created,
+                "documents_shared": documents_shared_count,
+                "documents_accessible": documents_accessible,
+            }
+        )
+
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        serializer = ChangePasswordSerializer(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
             serializer.save()
-            return Response({"detail": "Пароль успешно обновлён"}, status=status.HTTP_200_OK)
+            return Response(
+                {"detail": "Пароль успешно обновлён"}, status=status.HTTP_200_OK
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
