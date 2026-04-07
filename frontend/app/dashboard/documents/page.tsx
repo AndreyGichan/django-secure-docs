@@ -782,7 +782,7 @@ export default function DocumentsPage() {
       <div className="flex-1 overflow-auto p-6">
         {/* Filters */}
         <div className="mb-4 max-w-7xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Поиск документов..."

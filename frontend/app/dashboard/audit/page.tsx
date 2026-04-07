@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import {
   Search,
   Filter,
-  Download,
   X,
   ChevronLeft,
   ChevronRight,
@@ -31,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { getAuditLogs } from "@/lib/api/audit"
+import { getAuditLogs, getAuditActionCounts } from "@/lib/api/audit"
 
 interface AuditEntry {
   id: string
@@ -53,6 +52,8 @@ function getActionBadge(action: string) {
     DOWNLOAD: "bg-amber-500/15 text-amber-400 border-amber-500/30",
     SHARE: "bg-violet-500/15 text-violet-400 border-violet-500/30",
     LOGIN: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
+    LOGOUT: "bg-red-500/15 text-red-400 border-red-500/30",
+    APPROVE: "bg-blue-500/15 text-blue-400 border-blue-500/30"
   }
   const dots: Record<string, string> = {
     CREATE: "bg-emerald-400",
@@ -61,6 +62,8 @@ function getActionBadge(action: string) {
     DOWNLOAD: "bg-amber-400",
     SHARE: "bg-violet-400",
     LOGIN: "bg-cyan-400",
+    LOGOUT: "bg-red-400",
+    APPROVE: "bg-blue-400"
   }
   return (
     <Badge
@@ -80,13 +83,20 @@ export default function AuditPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
+  const [actionCounts, setActionCounts] = useState<Record<string, number>>({})
 
   useEffect(() => {
     loadLogs()
-  }, [page])
+    loadActionCounts()
+  }, [page, pageSize, actionFilter, search])
 
   const loadLogs = async () => {
-    const { data } = await getAuditLogs({ limit: pageSize, offset: (page - 1) * pageSize })
+    const { data } = await getAuditLogs({
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      action: actionFilter !== "all" ? actionFilter : undefined,
+      search: search || undefined,
+    })
 
     const mapped: AuditEntry[] = data.results.map((log: any) => ({
       id: log.id,
@@ -104,14 +114,15 @@ export default function AuditPage() {
     setTotalCount(data.count)
   }
 
-  const filtered = logs.filter((log) => {
-    const matchSearch =
-      log.user.toLowerCase().includes(search.toLowerCase()) ||
-      log.targetName.toLowerCase().includes(search.toLowerCase()) ||
-      log.email.toLowerCase().includes(search.toLowerCase())
-    const matchAction = actionFilter === "all" || log.action === actionFilter
-    return matchSearch && matchAction
-  })
+  const loadActionCounts = async () => {
+    try {
+      const { data } = await getAuditActionCounts({ search })  
+      setActionCounts(data)
+    } catch (err) {
+      console.error("Failed to load action counts", err)
+    }
+  }
+
 
   function getPaginationPages(currentPage: number, totalPages: number, maxVisible = 3): (number | "...")[] {
     const pages: (number | "...")[] = []
@@ -137,6 +148,7 @@ export default function AuditPage() {
     return pages
   }
 
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -149,13 +161,16 @@ export default function AuditPage() {
         {/* Filters */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 flex-1">
-            <div className="relative max-w-sm flex-1">
+            <div className="relative max-w-md flex-1">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search by user, email, or file..."
+                placeholder="Поиск по пользователю, email или файлу..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-8 pl-9 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground text-xs"
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
+                className="h-8 pl-9 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground text-xs tracking-wide"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -165,17 +180,19 @@ export default function AuditPage() {
             </div>
             <Select value={actionFilter} onValueChange={setActionFilter}>
               <SelectTrigger className="h-8 w-36 bg-secondary/50 border-border text-xs text-muted-foreground">
-                <Filter className="mr-2 h-3 w-3" />
+                <Filter className="mr-1 h-3 w-3" />
                 <SelectValue placeholder="Action" />
               </SelectTrigger>
               <SelectContent className="bg-popover text-popover-foreground border-border">
-                <SelectItem value="all" className="text-xs">All Actions</SelectItem>
+                <SelectItem value="all" className="text-xs">Все действия</SelectItem>
                 <SelectItem value="CREATE" className="text-xs">CREATE</SelectItem>
                 <SelectItem value="UPDATE" className="text-xs">UPDATE</SelectItem>
                 <SelectItem value="DELETE" className="text-xs">DELETE</SelectItem>
                 <SelectItem value="DOWNLOAD" className="text-xs">DOWNLOAD</SelectItem>
                 <SelectItem value="SHARE" className="text-xs">SHARE</SelectItem>
                 <SelectItem value="LOGIN" className="text-xs">LOGIN</SelectItem>
+                <SelectItem value="LOGOUT" className="text-xs">LOGOUT</SelectItem>
+                <SelectItem value="APPROVE" className="text-xs">APPROVE</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -187,12 +204,15 @@ export default function AuditPage() {
 
         {/* Summary badges */}
         <div className="mb-4 flex flex-wrap gap-2">
-          {["CREATE", "UPDATE", "DELETE", "DOWNLOAD", "SHARE", "LOGIN"].map((action) => {
-            const count = logs.filter((l) => l.action === action).length
+          {["CREATE", "UPDATE", "DELETE", "DOWNLOAD", "SHARE", "LOGIN", "LOGOUT", "APPROVE"].map((action) => {
+            const count = actionCounts[action] || 0
             return (
               <button
                 key={action}
-                onClick={() => setActionFilter(actionFilter === action ? "all" : action)}
+                onClick={() => {
+                  setActionFilter(actionFilter === action ? "all" : action)
+                  setPage(1)
+                }}
                 className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-mono transition-colors ${actionFilter === action
                   ? "border-[hsl(var(--gradient-from))]/50 bg-[hsl(var(--gradient-from))]/10 text-foreground"
                   : "border-border/50 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -223,7 +243,7 @@ export default function AuditPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((log) => (
+              {logs.map((log) => (
                 <TableRow key={log.id} className="border-border/30 hover:bg-secondary/30">
                   <TableCell className="font-mono text-[11px] text-muted-foreground">
                     {new Date(log.timestamp).toLocaleString("ru-RU", {
@@ -267,9 +287,9 @@ export default function AuditPage() {
         <div className="mt-4 flex items-center justify-between">
           <span className="text-xs text-muted-foreground tracking-wide">
             {"Показано "}
-            <span className="font-mono text-foreground">{filtered.length}</span>
-            {" из "}
             <span className="font-mono text-foreground">{logs.length}</span>
+            {" из "}
+            <span className="font-mono text-foreground">{totalCount}</span>
             {" событий"}
           </span>
 
