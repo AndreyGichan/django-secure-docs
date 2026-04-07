@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   FileText,
   LayoutDashboard,
@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { logout } from "@/lib/api/auth"
 
 const mainNav = [
   {
@@ -81,6 +82,17 @@ const adminNav = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      router.replace("/")
+    }
+  }
 
   return (
     <Sidebar variant="sidebar" collapsible="icon">
@@ -214,16 +226,14 @@ export function AppSidebar() {
               >
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard/profile">
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
-                   </Link>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/" className="text-destructive">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log Out
-                  </Link>
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

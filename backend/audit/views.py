@@ -8,7 +8,7 @@ from .permissions import IsAuditAdmin
 from .utils.pagination import AuditLimitOffsetPagination
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = AuditLog.objects.all()
+    queryset = AuditLog.objects.select_related("user").all()
     serializer_class = AuditLogSerializer
     permission_classes = [IsAuditAdmin]
     pagination_class = AuditLimitOffsetPagination
