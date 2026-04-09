@@ -30,6 +30,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { format } from "date-fns"
 import { getAuditLogs, getAuditActionCounts } from "@/lib/api/audit"
 
 interface AuditEntry {
@@ -84,11 +91,16 @@ export default function AuditPage() {
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
   const [actionCounts, setActionCounts] = useState<Record<string, number>>({})
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  })
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
 
   useEffect(() => {
     loadLogs()
     loadActionCounts()
-  }, [page, pageSize, actionFilter, search])
+  }, [page, pageSize, actionFilter, search, dateRange])
 
   const loadLogs = async () => {
     const { data } = await getAuditLogs({
@@ -96,6 +108,8 @@ export default function AuditPage() {
       offset: (page - 1) * pageSize,
       action: actionFilter !== "all" ? actionFilter : undefined,
       search: search || undefined,
+      date_from: dateRange.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
+      date_to: dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
     })
 
     const mapped: AuditEntry[] = data.results.map((log: any) => ({
@@ -116,7 +130,11 @@ export default function AuditPage() {
 
   const loadActionCounts = async () => {
     try {
-      const { data } = await getAuditActionCounts({ search })  
+      const { data } = await getAuditActionCounts({
+        search,
+        date_from: dateRange.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
+        date_to: dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
+      })
       setActionCounts(data)
     } catch (err) {
       console.error("Failed to load action counts", err)
@@ -146,6 +164,10 @@ export default function AuditPage() {
     pages.push(totalPages)
 
     return pages
+  }
+
+  const clearDateRange = () => {
+    setDateRange({ from: undefined, to: undefined })
   }
 
 
@@ -179,7 +201,7 @@ export default function AuditPage() {
               )}
             </div>
             <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger className="h-8 w-36 bg-secondary/50 border-border text-xs text-muted-foreground">
+              <SelectTrigger className="h-8 w-40 bg-secondary/50 border-border text-xs font-mono text-muted-foreground">
                 <Filter className="mr-1 h-3 w-3" />
                 <SelectValue placeholder="Action" />
               </SelectTrigger>
@@ -196,10 +218,111 @@ export default function AuditPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button variant="outline" size="sm" className="h-8 text-xs bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:bg-secondary">
-            <Calendar className="mr-2 h-3 w-3" />
-            Date Range
-          </Button>
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-8 text-xs font-mono bg-secondary/50 border-border hover:text-foreground hover:bg-secondary ${dateRange.from || dateRange.to ? "text-foreground border-violet-500/50" : "text-muted-foreground"
+                  }`}
+              >
+                <Calendar className="h-3 w-3" />
+                {dateRange.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "dd.MM.yy")} - {format(dateRange.to, "dd.MM.yy")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "dd.MM.yyyy")
+                  )
+                ) : (
+                  "Период"
+                )}
+                {(dateRange.from || dateRange.to) && (
+                  <span
+                    role="button"
+                    className="ml-2 p-0.5 rounded hover:bg-rose-500/20 transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      clearDateRange()
+                    }}
+                    onPointerDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                  >
+                    <X className="h-3 w-3 hover:text-rose-400" />
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto p-0 bg-popover border-border"
+              align="end"
+              sideOffset={4}
+            >
+              <div className="p-3 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium font-mono text-foreground">Выберите диапазон дат</span>
+                  {(dateRange.from || dateRange.to) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-[10px] font-mono text-muted-foreground hover:text-foreground"
+                      onClick={clearDateRange}
+                    >
+                      Очистить
+                    </Button>
+                  )}
+                </div>
+                {dateRange.from && (
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className="font-mono bg-secondary/50 px-1.5 py-0.5 rounded">
+                      {format(dateRange.from, "dd.MM.yyyy")}
+                    </span>
+                    {dateRange.to && (
+                      <>
+                        <span>-</span>
+                        <span className="font-mono bg-secondary/50 px-1.5 py-0.5 rounded">
+                          {format(dateRange.to, "dd.MM.yyyy")}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              <CalendarComponent
+                mode="range"
+                selected={{ from: dateRange.from, to: dateRange.to }}
+                onSelect={(range) => {
+                  setDateRange({ from: range?.from, to: range?.to })
+                }}
+                numberOfMonths={2}
+                className="p-3"
+              />
+              <div className="p-3 border-t border-border flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs tracking-wide bg-secondary/50 border-border text-muted-foreground hover:text-foreground"
+                  onClick={() => setDatePickerOpen(false)}
+                >
+                  Отмена
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 text-xs tracking-wide bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground border-0"
+                  onClick={() => {
+                    setPage(1)
+                    setDatePickerOpen(false)
+                  }}
+                >
+                  Применить
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Summary badges */}

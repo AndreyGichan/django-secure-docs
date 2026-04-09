@@ -10,6 +10,7 @@ from .models import AuditLog
 from .serializers import AuditLogSerializer
 from .permissions import IsAuditAdmin
 from .utils.pagination import AuditLimitOffsetPagination
+from .filters import AuditLogFilter
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("user").all()
@@ -18,7 +19,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = AuditLimitOffsetPagination
 
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ["action"]
+    filterset_class = AuditLogFilter
     search_fields = ["user__email", "user__full_name", "target_type"]
     ordering_fields = ["timestamp"]
 
