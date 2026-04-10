@@ -16,6 +16,10 @@ import {
     Share2,
     Trash2,
     Plus,
+    KeyRound,
+    Upload,
+    AlertTriangle,
+    FileKey
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -580,52 +584,73 @@ export function ShareDocumentDialog({
                                     Private Key (.pem)
                                 </Label>
 
-                                <input
-                                    type="file"
-                                    accept=".pem"
-                                    ref={hiddenPrivateKeyInput}
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0]
-                                        if (file) setPrivateKeyFile(file)
-                                    }}
-                                    className="hidden"
-                                />
+                                {!privateKeyFile ? (
+                                    <div
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={(e) => {
+                                            e.preventDefault()
+                                            const file = e.dataTransfer.files?.[0]
+                                            if (file) setPrivateKeyFile(file)
+                                        }}
+                                    >
+                                        <input
+                                            ref={hiddenPrivateKeyInput}
+                                            type="file"
+                                            accept=".pem"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0]
+                                                if (file) setPrivateKeyFile(file)
+                                            }}
+                                            className="hidden"
+                                            id="share-private-key"
+                                        />
 
-                                <div
-                                    onClick={() => hiddenPrivateKeyInput.current?.click()}
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={(e) => {
-                                        e.preventDefault()
-                                        const file = e.dataTransfer.files?.[0]
-                                        if (file) setPrivateKeyFile(file)
-                                    }}
-                                    className="flex h-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 transition-colors hover:border-[hsl(var(--gradient-from))]/50 hover:bg-secondary/50"
-                                >
-                                    {privateKeyFile ? (
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-sm text-foreground truncate">{privateKeyFile.name}</span>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setPrivateKeyFile(null)
-                                                    if (hiddenPrivateKeyInput.current) hiddenPrivateKeyInput.current.value = ""
-                                                }}
-                                                className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </Button>
+                                        <label
+                                            htmlFor="share-private-key"
+                                            className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-border/60 bg-card/50 px-3 py-3 transition-all duration-200 hover:border-[hsl(var(--gradient-from))]/30 hover:bg-secondary/30 group"
+                                        >
+                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/60 border border-border/50 group-hover:border-[hsl(var(--gradient-from))]/20 transition-colors">
+                                                <KeyRound className="h-4 w-4 text-muted-foreground group-hover:text-[hsl(var(--gradient-from))] transition-colors" />
+                                            </div>
+
+                                            <div className="flex flex-col">
+                                                <span className="text-[12px] font-medium tracking-wide text-muted-foreground group-hover:text-foreground transition-colors">
+                                                    Прикрепить приватный ключ
+                                                </span>
+                                                <span className="text-[11px] text-muted-foreground/60">
+                                                    .pem
+                                                </span>
+                                            </div>
+
+                                            <Upload className="ml-auto h-4 w-4 text-muted-foreground/40 group-hover:text-[hsl(var(--gradient-from))]/60 transition-colors" />
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-3 py-2.5">
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/15">
+                                            <FileKey className="h-4 w-4 text-emerald-400" />
                                         </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Plus className="h-8 w-8 text-muted-foreground" />
-                                            <span className="text-xs text-muted-foreground tracking-wide">
-                                                Перетащите файл .pem или кликните, чтобы выбрать
+
+                                        <div className="flex flex-col flex-1 min-w-0">
+                                            <span className="text-[12px] font-medium text-emerald-400 truncate">
+                                                {privateKeyFile.name}
+                                            </span>
+                                            <span className="text-[10px] text-emerald-400/50 font-mono">
+                                                {(privateKeyFile.size / 1024).toFixed(1)} KB
                                             </span>
                                         </div>
-                                    )}
-                                </div>
+
+                                        <button
+                                            onClick={() => {
+                                                setPrivateKeyFile(null)
+                                                if (hiddenPrivateKeyInput.current) hiddenPrivateKeyInput.current.value = ""
+                                            }}
+                                            className="p-1 rounded-md hover:bg-secondary/50 transition-colors"
+                                        >
+                                            <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   BarChart,
   Bar,
@@ -18,7 +18,6 @@ import {
   Area,
 } from "recharts"
 import { AlertTriangle, TrendingUp, Download, Share2, Users } from "lucide-react"
-
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -30,68 +29,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  getTopUsers,
+  getDocumentActivity,
+  getDownloadActivity,
+  getSharingActivity,
+  getRolesDistribution,
+  getDailyActivity,
+  getSuspiciousActivity,
+  getCollaborationIndex
+} from "@/lib/api/reports"
 
-const downloadActivity = [
-  { email: "ivanov@company.com", downloads: 245 },
-  { email: "petrova@company.com", downloads: 198 },
-  { email: "sidorov@company.com", downloads: 156 },
-  { email: "kozlova@company.com", downloads: 134 },
-  { email: "novikov@company.com", downloads: 87 },
-]
-
-const sharingActivity = [
-  { email: "petrova@company.com", shared: 89 },
-  { email: "ivanov@company.com", shared: 67 },
-  { email: "kozlova@company.com", shared: 45 },
-  { email: "sidorov@company.com", shared: 34 },
-  { email: "novikov@company.com", shared: 12 },
-]
-
-const documentActivity = [
-  { title: "Employee_Handbook.pdf", versions: 12, downloads: 456, lastAccessed: "2 hours ago" },
-  { title: "Q4_Financial_Report.pdf", versions: 5, downloads: 312, lastAccessed: "3 hours ago" },
-  { title: "NDA_Template_v2.docx", versions: 2, downloads: 234, lastAccessed: "5 hours ago" },
-  { title: "Product_Roadmap.pdf", versions: 8, downloads: 189, lastAccessed: "1 day ago" },
-  { title: "API_Documentation.docx", versions: 6, downloads: 145, lastAccessed: "1 day ago" },
-  { title: "Budget_Forecast_2026.xlsx", versions: 3, downloads: 98, lastAccessed: "2 days ago" },
-]
-
-const dailyActivity = [
-  { date: "Feb 1", actions: 234 },
-  { date: "Feb 2", actions: 312 },
-  { date: "Feb 3", actions: 189 },
-  { date: "Feb 4", actions: 278 },
-  { date: "Feb 5", actions: 367 },
-  { date: "Feb 6", actions: 289 },
-  { date: "Feb 7", actions: 345 },
-  { date: "Feb 8", actions: 412 },
-  { date: "Feb 9", actions: 298 },
-  { date: "Feb 10", actions: 356 },
-  { date: "Feb 11", actions: 423 },
-  { date: "Feb 12", actions: 378 },
-  { date: "Feb 13", actions: 456 },
-  { date: "Feb 14", actions: 389 },
-]
-
-const rolesDistribution = [
-  { role: "Employee", count: 45 },
-  { role: "Manager", count: 12 },
-  { role: "Admin", count: 3 },
-]
-
-const suspiciousActivity = [
-  { email: "unknown1@ext.com", downloads: 342, risk: "high" },
-  { email: "contractor@partner.com", downloads: 189, risk: "medium" },
-  { email: "temp_user@company.com", downloads: 156, risk: "medium" },
-]
-
-const userCentrality = [
-  { email: "petrova@company.com", score: 0.92 },
-  { email: "ivanov@company.com", score: 0.85 },
-  { email: "kozlova@company.com", score: 0.73 },
-  { email: "sidorov@company.com", score: 0.61 },
-  { email: "novikov@company.com", score: 0.45 },
-]
 
 const PIE_COLORS = [
   "hsl(262, 83%, 58%)",
@@ -105,7 +53,7 @@ function CustomTooltip({ active, payload, label }: any) {
       <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg">
         <p className="font-medium">{label}</p>
         <p className="text-muted-foreground">
-          {"Value: "}
+          {"Значение: "}
           <span className="font-mono text-foreground">{payload[0].value}</span>
         </p>
       </div>
@@ -118,18 +66,106 @@ function getRiskBadge(risk: string) {
   if (risk === "high") {
     return (
       <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20 text-[10px] font-mono">
-        High Risk
+        Высокий риск
       </Badge>
     )
   }
   return (
     <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px] font-mono">
-      Medium Risk
+      Средний риск
     </Badge>
   )
 }
 
 export default function AnalyticsPage() {
+  const [downloadActivity, setDownloadActivity] = useState<any[]>([])
+  const [sharingActivity, setSharingActivity] = useState<any[]>([])
+  const [documentActivity, setDocumentActivity] = useState<any[]>([])
+  const [dailyActivity, setDailyActivity] = useState<any[]>([])
+  const [rolesDistribution, setRolesDistribution] = useState<any[]>([])
+  const [suspiciousActivity, setSuspiciousActivity] = useState<any[]>([])
+  const [topUsers, setTopUsers] = useState<any[]>([])
+  const [collaborationIndex, setCollaborationIndex] = useState<any[]>([])
+  const maxScore = Math.max(...collaborationIndex.map(u => u.score), 1)
+
+  useEffect(() => {
+    const loadData = async () => {
+      const [
+        downloads,
+        sharing,
+        documents,
+        daily,
+        roles,
+        suspicious,
+        collaboration,
+        top
+      ] = await Promise.all([
+        getDownloadActivity(),
+        getSharingActivity(),
+        getDocumentActivity(),
+        getDailyActivity(),
+        getRolesDistribution(),
+        getSuspiciousActivity(),
+        getCollaborationIndex(),
+        getTopUsers()
+      ])
+
+      setDownloadActivity(
+        downloads.data.map((u: any) => ({
+          email: u.user_email,
+          downloads: u.downloads_count
+        }))
+      )
+      setSharingActivity(
+        sharing.data.map((u: any) => ({
+          email: u.owner_email,
+          shared: u.total_shared
+        }))
+      )
+      setDocumentActivity(
+        documents.data.map((doc: any) => ({
+          ...doc,
+          last_accessed: doc.last_accessed
+            ? new Date(doc.last_accessed).toLocaleString()
+            : "Никогда"
+        }))
+      )
+      setDailyActivity(
+        daily.data.map((d: any) => ({
+          date: new Date(d.date).toLocaleDateString(),
+          actions: d.actions_count
+        }))
+      )
+      setRolesDistribution(
+        roles.data.map((r: any) => ({
+          role: r.role,
+          count: r.users_count
+        }))
+      )
+      setSuspiciousActivity(
+        suspicious.data.map((u: any) => ({
+          email: u.user_email,
+          downloads: u.downloads_count,
+          risk: u.downloads_count > 50 ? "high" : "medium"
+        }))
+      )
+      setCollaborationIndex(
+        collaboration.data.map((u: any) => ({
+          email: u.user_email,
+          score: u.collaboration_index
+        }))
+      )
+      setTopUsers(
+        top.data.map((u: any) => ({
+          email: u.user_email,
+          actions_count: u.actions_count
+        }))
+      )
+    }
+
+    loadData()
+  }, [])
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -138,43 +174,43 @@ export default function AnalyticsPage() {
       />
 
       <div className="flex-1 overflow-auto p-6">
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs defaultValue="overview" className="w-full max-w-7xl mx-auto">
           <TabsList className="mb-6 bg-secondary/50 border border-border/50">
             <TabsTrigger
               value="overview"
-              className="text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsl(var(--gradient-from))] data-[state=active]:to-[hsl(var(--gradient-to))] data-[state=active]:text-primary-foreground"
+              className="text-xs font-mono data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsl(var(--gradient-from))] data-[state=active]:to-[hsl(var(--gradient-to))] data-[state=active]:text-primary-foreground"
             >
-              Overview
+              Обзор
             </TabsTrigger>
             <TabsTrigger
               value="documents"
-              className="text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsl(var(--gradient-from))] data-[state=active]:to-[hsl(var(--gradient-to))] data-[state=active]:text-primary-foreground"
+              className="text-xs font-mono data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsl(var(--gradient-from))] data-[state=active]:to-[hsl(var(--gradient-to))] data-[state=active]:text-primary-foreground"
             >
-              Documents
+              Документы
             </TabsTrigger>
             <TabsTrigger
               value="users"
-              className="text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsl(var(--gradient-from))] data-[state=active]:to-[hsl(var(--gradient-to))] data-[state=active]:text-primary-foreground"
+              className="text-xs font-mono data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsl(var(--gradient-from))] data-[state=active]:to-[hsl(var(--gradient-to))] data-[state=active]:text-primary-foreground"
             >
-              Users
+              Пользователи
             </TabsTrigger>
             <TabsTrigger
               value="security"
-              className="text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsl(var(--gradient-from))] data-[state=active]:to-[hsl(var(--gradient-to))] data-[state=active]:text-primary-foreground"
+              className="text-xs font-mono data-[state=active]:bg-gradient-to-r data-[state=active]:from-[hsl(var(--gradient-from))] data-[state=active]:to-[hsl(var(--gradient-to))] data-[state=active]:text-primary-foreground"
             >
-              Security
+              Безопасность
             </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="mt-0">
+          <TabsContent value="overview" className="mt-0 max-w-7xl mx-auto">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {/* Daily Activity Trend */}
               <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
                 <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-violet-500/5 blur-3xl" />
                 <div className="mb-4">
-                  <h3 className="text-sm font-medium text-foreground">Daily Activity</h3>
-                  <p className="text-xs text-muted-foreground">Actions per day</p>
+                  <h3 className="text-sm font-mono font-medium text-foreground">Ежедневная активность</h3>
+                  <p className="text-xs font-mono text-muted-foreground">Дейстивя по дням</p>
                 </div>
                 <ResponsiveContainer width="100%" height={260}>
                   <AreaChart data={dailyActivity}>
@@ -197,8 +233,8 @@ export default function AnalyticsPage() {
               <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
                 <div className="absolute -bottom-16 -left-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
                 <div className="mb-4">
-                  <h3 className="text-sm font-medium text-foreground">Roles Distribution</h3>
-                  <p className="text-xs text-muted-foreground">Users by role</p>
+                  <h3 className="text-sm font-mono font-medium text-foreground">Распределение ролей</h3>
+                  <p className="text-xs font-mono text-muted-foreground">Пользователи по ролям</p>
                 </div>
                 <div className="flex items-center gap-8">
                   <ResponsiveContainer width="50%" height={220}>
@@ -225,7 +261,7 @@ export default function AnalyticsPage() {
                         <div className="h-3 w-3 rounded-full" style={{ backgroundColor: PIE_COLORS[i] }} />
                         <div className="flex flex-col">
                           <span className="text-xs font-medium text-foreground">{item.role}</span>
-                          <span className="text-[10px] text-muted-foreground font-mono">{item.count} users</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">{item.count} пользователей</span>
                         </div>
                       </div>
                     ))}
@@ -241,8 +277,8 @@ export default function AnalyticsPage() {
                     <Download className="h-3.5 w-3.5 text-violet-400" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-foreground">Download Activity</h3>
-                    <p className="text-xs text-muted-foreground">Downloads per user</p>
+                    <h3 className="text-sm font-mono font-medium text-foreground">Активность загрузок</h3>
+                    <p className="text-xs font-mono text-muted-foreground">Загрузки по пользователям</p>
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={220}>
@@ -254,7 +290,14 @@ export default function AnalyticsPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 14%)" vertical={false} />
-                    <XAxis dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 9 }} />
+                    <XAxis
+                      dataKey="email"
+                      interval={0}
+                      angle={-35}
+                      textAnchor="end"
+                      height={60}
+                      tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 9 }}
+                    />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 10 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="downloads" fill="url(#dlGrad)" radius={[4, 4, 0, 0]} />
@@ -270,8 +313,8 @@ export default function AnalyticsPage() {
                     <Share2 className="h-3.5 w-3.5 text-cyan-400" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-foreground">Sharing Activity</h3>
-                    <p className="text-xs text-muted-foreground">Shares by owner</p>
+                    <h3 className="text-sm font-mono font-medium text-foreground">Активность предоставления доступа</h3>
+                    <p className="text-xs font-mono text-muted-foreground">Предоставление доступа по владельцам</p>
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={220}>
@@ -283,7 +326,14 @@ export default function AnalyticsPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 14%)" vertical={false} />
-                    <XAxis dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 9 }} />
+                    <XAxis
+                      dataKey="email"
+                      interval={0}
+                      angle={-35}
+                      textAnchor="end"
+                      height={60}
+                      tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 9 }}
+                    />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 10 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="shared" fill="url(#shareGrad)" radius={[4, 4, 0, 0]} />
@@ -294,12 +344,12 @@ export default function AnalyticsPage() {
           </TabsContent>
 
           {/* Documents Tab */}
-          <TabsContent value="documents" className="mt-0">
+          <TabsContent value="documents" className="mt-0 max-w-7xl mx-auto">
             <div className="relative rounded-2xl border border-border/50 bg-card overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
               <div className="p-5 border-b border-border/50">
-                <h3 className="text-sm font-medium text-foreground">Document Activity Report</h3>
-                <p className="text-xs text-muted-foreground">Activity metrics per document</p>
+                <h3 className="text-sm font-mono font-medium text-foreground">Отчет по активности документов</h3>
+                <p className="text-xs font-mono text-muted-foreground">Метрики активности по документам</p>
               </div>
               <Table>
                 <TableHeader>
@@ -315,12 +365,12 @@ export default function AnalyticsPage() {
                     <TableRow key={i} className="border-border/30 hover:bg-secondary/30">
                       <TableCell className="text-xs font-medium text-foreground">{doc.title}</TableCell>
                       <TableCell className="text-center">
-                        <span className="font-mono text-xs text-muted-foreground">v{doc.versions}</span>
+                        <span className="font-mono text-xs text-muted-foreground">v{doc.total_versions}</span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className="font-mono text-xs text-foreground">{doc.downloads}</span>
+                        <span className="font-mono text-xs text-foreground">{doc.total_downloads}</span>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{doc.lastAccessed}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{doc.last_accessed}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -329,9 +379,8 @@ export default function AnalyticsPage() {
           </TabsContent>
 
           {/* Users Tab */}
-          <TabsContent value="users" className="mt-0">
+          <TabsContent value="users" className="mt-0 max-w-7xl mx-auto">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {/* User Centrality */}
               <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
                 <div className="absolute -top-16 -right-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />
                 <div className="mb-4 flex items-center gap-2">
@@ -339,12 +388,12 @@ export default function AnalyticsPage() {
                     <Users className="h-3.5 w-3.5 text-violet-400" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-foreground">User Centrality</h3>
-                    <p className="text-xs text-muted-foreground">Most central users in sharing graph</p>
+                    <h3 className="text-sm font-mono font-medium text-foreground">Индекс сотрудничества</h3>
+                    <p className="text-xs font-mono text-muted-foreground">Оценка активности пользователей на основе предоставления доступа и загрузок</p>
                   </div>
                 </div>
                 <div className="flex flex-col gap-3">
-                  {userCentrality.map((user, i) => (
+                  {collaborationIndex.map((user, i) => (
                     <div key={user.email} className="flex items-center gap-3">
                       <span className="w-5 text-xs font-mono text-muted-foreground text-right">{i + 1}</span>
                       <div className="flex-1">
@@ -355,7 +404,7 @@ export default function AnalyticsPage() {
                         <div className="h-1.5 w-full rounded-full bg-secondary">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))]"
-                            style={{ width: `${user.score * 100}%` }}
+                            style={{ width: `${(user.score / maxScore) * 100}%` }}
                           />
                         </div>
                       </div>
@@ -372,12 +421,12 @@ export default function AnalyticsPage() {
                     <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-foreground">Top Active Users</h3>
-                    <p className="text-xs text-muted-foreground">Most actions this period</p>
+                    <h3 className="text-sm font-mono font-medium text-foreground">Самые активные пользователи</h3>
+                    <p className="text-xs font-mono text-muted-foreground">Наибольшее количество действий за период</p>
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={downloadActivity} layout="vertical" barSize={18}>
+                  <BarChart data={topUsers} layout="vertical" barSize={18}>
                     <defs>
                       <linearGradient id="topBarGrad" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stopColor="hsl(262, 83%, 58%)" />
@@ -388,7 +437,7 @@ export default function AnalyticsPage() {
                     <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 10 }} />
                     <YAxis type="category" dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 9 }} width={140} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="downloads" fill="url(#topBarGrad)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="actions_count" fill="url(#topBarGrad)" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -396,7 +445,7 @@ export default function AnalyticsPage() {
           </TabsContent>
 
           {/* Security Tab */}
-          <TabsContent value="security" className="mt-0">
+          <TabsContent value="security" className="mt-0 max-w-7xl mx-auto">
             <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-card p-5">
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-rose-500/40 to-transparent" />
               <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-rose-500/5 blur-3xl" />
@@ -406,8 +455,8 @@ export default function AnalyticsPage() {
                   <div className="absolute -inset-0.5 rounded-xl bg-rose-500/10 blur-sm" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-foreground">Suspicious Activity</h3>
-                  <p className="text-xs text-muted-foreground">Users with anomalously high download counts</p>
+                  <h3 className="text-sm font-mono font-medium text-foreground">Подозрительная активность</h3>
+                  <p className="text-xs font-mono text-muted-foreground">Пользователи с аномально высоким количеством загрузок</p>
                 </div>
               </div>
               <div className="rounded-lg border border-border/50 overflow-hidden">

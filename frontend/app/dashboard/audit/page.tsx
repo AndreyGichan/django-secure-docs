@@ -170,6 +170,18 @@ export default function AuditPage() {
     setDateRange({ from: undefined, to: undefined })
   }
 
+  function getUserInitials(name: string) {
+    if (!name) return "?"
+
+    const parts = name.trim().split(" ")
+
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase()
+    }
+
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+
 
   return (
     <div className="flex flex-1 flex-col">
@@ -181,7 +193,7 @@ export default function AuditPage() {
 
       <div className="flex-1 overflow-auto p-6">
         {/* Filters */}
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 max-w-7xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 flex-1">
             <div className="relative max-w-md flex-1">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -326,7 +338,7 @@ export default function AuditPage() {
         </div>
 
         {/* Summary badges */}
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 max-w-7xl mx-auto flex flex-wrap gap-2">
           {["CREATE", "UPDATE", "DELETE", "DOWNLOAD", "SHARE", "LOGIN", "LOGOUT", "APPROVE"].map((action) => {
             const count = actionCounts[action] || 0
             return (
@@ -349,7 +361,7 @@ export default function AuditPage() {
         </div>
 
         {/* Table */}
-        <div className="relative rounded-2xl border border-border/50 bg-card overflow-hidden">
+        <div className="relative max-w-7xl mx-auto rounded-2xl border border-border/50 bg-card overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/30 to-transparent" />
           <Table>
             <TableHeader>
@@ -381,7 +393,7 @@ export default function AuditPage() {
                     <div className="flex items-center gap-2.5">
                       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-cyan-500/20 border border-violet-500/10">
                         <span className="text-[9px] font-bold text-violet-400">
-                          {log.user.slice(0, 2).toUpperCase()}
+                          {getUserInitials(log.user)}
                         </span>
                       </div>
                       <div className="flex flex-col">
@@ -407,7 +419,7 @@ export default function AuditPage() {
         </div>
 
         {/* Pagination */}
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 max-w-7xl mx-auto flex items-center justify-between">
           <span className="text-xs text-muted-foreground tracking-wide">
             {"Показано "}
             <span className="font-mono text-foreground">{logs.length}</span>

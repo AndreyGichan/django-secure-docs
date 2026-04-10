@@ -63,8 +63,8 @@ class ReportsViewSet(viewsets.ViewSet):
     def document_graph(self, request, document_id=None):
         graph = GraphAnalyticsService.document_sharing_graph(document_id)
         return Response(graph)
-
+    
     @action(detail=False, methods=['get'])
-    def user_centrality(self, request):
-        data = GraphAnalyticsService.user_centrality()
-        return Response(CentralitySerializer(data, many=True).data)
+    def collaboration_index(self, request):
+        data = ReportsService.collaboration_index()
+        return Response(data)
