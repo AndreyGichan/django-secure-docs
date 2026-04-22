@@ -2,11 +2,17 @@ from rest_framework import serializers
 from .models import User
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from django.contrib.auth import password_validation
+from documents.models import Document
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    documentsCount = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "public_key", "role", "date_joined", "last_login"]
+        fields = ["id", "email", "full_name", "public_key", "role", "date_joined", "last_login", "documentsCount"]
+
+    def get_documentsCount(self, obj):
+        return Document.objects.filter(owner=obj).count()
 
 
 class CustomRegisterSerializer(RegisterSerializer):
@@ -14,6 +20,7 @@ class CustomRegisterSerializer(RegisterSerializer):
     full_name = serializers.CharField(required=True)
     email = serializers.EmailField(required=True) 
     public_key = serializers.CharField(required=True)
+    role = serializers.ChoiceField(choices=["admin", "manager", "employee"], required=False)
 
     def validate_email(self, email):
         if User.objects.filter(email=email).exists():
@@ -29,12 +36,13 @@ class CustomRegisterSerializer(RegisterSerializer):
 
     def save(self, request):
         data = self.get_cleaned_data()
+        role = self.validated_data.get("role", "employee") # type: ignore
         user = User.objects.create_user( # type: ignore
-        email=data['email'],
-        password=data['password1'],
-        full_name=data['full_name'],
-        role='employee', 
-        public_key=self.validated_data.get('public_key')  # type: ignore
+            email=data['email'],
+            password=data['password1'],
+            full_name=data['full_name'],
+            role = role,
+            public_key=self.validated_data.get('public_key')  # type: ignore
         )
         return user
 

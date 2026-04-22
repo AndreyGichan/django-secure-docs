@@ -8,14 +8,21 @@ interface RegisterData {
   public_key: string,
 }
 
+interface SearchUsersParams {
+  search?: string;
+  limit?: number;
+  offset?: number;
+  role?: string;
+}
+
 export const login = (data: { email: string; password: string }) =>
   API.post("users/login/", data);
 export const register = (data: RegisterData) => API.post("users/register/", data);
 export const logout = () => API.post("users/logout/");
 export const getCurrentUser = () => API.get("users/profile/");
-export const searchUsers = (query: string) =>
+export const searchUsers = (params: SearchUsersParams) =>
   API.get("users/search/", {
-    params: { search: query },
+    params,
   });
 export const updateUserPublicKey = (publicKey: string) =>
   API.patch("users/profile/", { public_key: publicKey })

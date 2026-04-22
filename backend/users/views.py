@@ -14,6 +14,7 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.generics import UpdateAPIView
 from .serializers import ChangePasswordSerializer
+from .utils.pagination import UsersLimitOffsetPagination
 
 
 class LoginView(BaseLoginView):
@@ -88,6 +89,7 @@ class UserSearchView(ListAPIView):
     permission_classes = [IsAuthenticated]
     filter_backends = [SearchFilter]
     search_fields = ["email", "full_name"]
+    pagination_class = UsersLimitOffsetPagination
 
     queryset = User.objects.all()
 

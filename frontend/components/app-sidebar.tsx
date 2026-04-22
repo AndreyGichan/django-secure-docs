@@ -13,6 +13,7 @@ import {
   User,
   Sparkles,
   KeyRound,
+  Users,
 } from "lucide-react"
 
 import {
@@ -60,6 +61,12 @@ const mainNav = [
 ]
 
 const adminNav = [
+  {
+    title: "Users",
+    href: "/dashboard/users",
+    icon: Users,
+    color: "text-sky-400",
+  },
   {
     title: "Audit Log",
     href: "/dashboard/audit",
