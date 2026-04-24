@@ -7,6 +7,8 @@ from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.filters import SearchFilter
 from rest_framework.decorators import action
+from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import User
 from .serializers import UserProfileSerializer
 from documents.models import Document, DocumentAccess
@@ -74,7 +76,6 @@ class UserProfileView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    # @action(detail=False, methods=['patch'], permission_classes=[IsAuthenticated])
     def patch(self, request):
         public_key = request.data.get("public_key")
         if not public_key:
@@ -83,18 +84,6 @@ class UserProfileView(APIView):
         request.user.save()
         return Response({"public_key": public_key}, status=status.HTTP_200_OK)
 
-
-class UserSearchView(ListAPIView):
-    serializer_class = UserProfileSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [SearchFilter]
-    search_fields = ["email", "full_name"]
-    pagination_class = UsersLimitOffsetPagination
-
-    queryset = User.objects.all()
-
-    def get_queryset(self): # type: ignore
-        return User.objects.exclude(id=self.request.user.pk)
 
 
 class UserStatsView(APIView):
@@ -135,3 +124,19 @@ class ChangePasswordView(APIView):
             serializer.save()
             return Response({"detail": "Пароль успешно обновлён"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UsersViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserProfileSerializer
+    pagination_class = UsersLimitOffsetPagination
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter
+    ]
+
+    search_fields = ["email", "full_name"]
+    filterset_fields = ["role", "is_active"]
+    ordering_fields = ["date_joined", "last_login"]

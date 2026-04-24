@@ -167,13 +167,18 @@ export default function UsersPage() {
     const [totalCount, setTotalCount] = useState(0)
 
     useEffect(() => {
-        loadUsers(search, page)
-    }, [search, page])
+        const delay = setTimeout(() => {
+            loadUsers(search, page)
+        }, 300)
+
+        return () => clearTimeout(delay)
+    }, [search, page, roleFilter])
 
     const loadUsers = async (searchValue: string, pageValue: number) => {
         try {
             const res = await searchUsers({
                 search: searchValue,
+                role: roleFilter !== "all" ? roleFilter : undefined,
                 limit: pageSize,
                 offset: (pageValue - 1) * pageSize,
             })
@@ -316,10 +321,10 @@ export default function UsersPage() {
                         <div className="relative max-w-sm flex-1">
                             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                             <Input
-                                placeholder="Search by name, email, or department..."
+                                placeholder="Поиск по имени или email..."
                                 value={search}
                                 onChange={(e) => handleSearch(e.target.value)}
-                                className="h-8 pl-9 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground text-xs"
+                                className="h-8 pl-9 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground text-xs tracking-wide"
                             />
                             {search && (
                                 <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
