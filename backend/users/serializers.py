@@ -69,3 +69,11 @@ class ChangePasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data['new_password']) # type: ignore
         user.save()
         return user
+
+
+class AdminResetPasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(required=True)
+
+    def validate_new_password(self, value):
+        password_validation.validate_password(value)
+        return value

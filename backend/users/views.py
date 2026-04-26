@@ -15,7 +15,7 @@ from documents.models import Document, DocumentAccess
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework.generics import UpdateAPIView
-from .serializers import ChangePasswordSerializer
+from .serializers import ChangePasswordSerializer, AdminResetPasswordSerializer
 from .utils.pagination import UsersLimitOffsetPagination
 from .permissions import IsAdminRole
 
@@ -51,6 +51,23 @@ class UsersViewSet(viewsets.ModelViewSet):
         if self.action in ["update", "partial_update", "destroy", "create"]:
             return [IsAdminRole()]
         return [IsAuthenticated()]
+    
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAdminRole])
+    def reset_password(self, request, pk=None):
+        user = self.get_object()
+
+        serializer = AdminResetPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            user.set_password(serializer.validated_data["new_password"])
+            user.save()
+
+            return Response(
+                {"detail": "Пароль пользователя сброшен"},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LoginView(BaseLoginView):

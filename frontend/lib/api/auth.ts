@@ -33,3 +33,7 @@ export const updateUser = (id: string, data: {
   email: string
   role: string
 }) => API.patch(`users/users/${id}/`, data)
+export const adminResetPassword = (id: string, newPassword: string) =>
+  API.post(`users/users/${id}/reset_password/`, {
+    new_password: newPassword,
+  });

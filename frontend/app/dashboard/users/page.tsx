@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { searchUsers, deleteUser, updateUser } from "@/lib/api/auth"
+import { searchUsers, deleteUser, updateUser, adminResetPassword } from "@/lib/api/auth"
 
 interface User {
     id: string
@@ -624,7 +624,7 @@ export default function UsersPage() {
 
                         {/* Generate Password Section */}
                         <div className="flex flex-col gap-3">
-                            <Label className="text-xs text-muted-foreground">New Password</Label>
+                            <Label className="text-xs font-mono text-muted-foreground">Новый пароль</Label>
 
                             {!passwordGenerated ? (
                                 <Button
@@ -661,15 +661,15 @@ export default function UsersPage() {
                                             variant="ghost"
                                             size="sm"
                                             onClick={generatePassword}
-                                            className="h-7 text-[10px] text-muted-foreground hover:text-foreground"
+                                            className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
                                         >
-                                            <KeyRound className="mr-1.5 h-3 w-3" />
-                                            Regenerate
+                                            <KeyRound className="h-3 w-3" />
+                                            Пересоздать
                                         </Button>
                                         {passwordCopied && (
-                                            <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                                            <span className="text-[11px] tracking-wide text-emerald-400 flex items-center gap-1">
                                                 <Check className="h-3 w-3" />
-                                                Copied to clipboard
+                                                Скопировано в буфер обмена
                                             </span>
                                         )}
                                     </div>
@@ -682,7 +682,7 @@ export default function UsersPage() {
                             <>
                                 <Separator className="my-4 bg-border/50" />
                                 <div className="flex flex-col gap-2">
-                                    <Label className="text-xs text-muted-foreground">Or enter custom password</Label>
+                                    <Label className="text-xs text-muted-foreground font-mono">Или введите собственный пароль</Label>
                                     <Input
                                         type="text"
                                         value={newPassword}
@@ -706,8 +706,17 @@ export default function UsersPage() {
                         <Button
                             className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0"
                             disabled={!newPassword}
-                            onClick={() => {
-                                setResetPasswordOpen(false)
+                            onClick={async () => {
+                                if (!resetPasswordUser || !newPassword) return
+
+                                try {
+                                    await adminResetPassword(resetPasswordUser.id, newPassword)
+
+                                    setResetPasswordOpen(false)
+
+                                } catch (e) {
+                                    console.error("Ошибка сброса пароля", e)
+                                }
                             }}
                         >
                             Сбросить пароль
@@ -718,7 +727,7 @@ export default function UsersPage() {
 
             {/* Edit User Dialog */}
             <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
-                <DialogContent className="bg-card text-card-foreground border-border max-w-md">
+                <DialogContent onOpenAutoFocus={(e) => e.preventDefault()} className="bg-card text-card-foreground border-border max-w-md">
                     <DialogHeader>
                         <div className="flex items-center gap-3">
                             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-cyan-500/20 border border-violet-500/20">
