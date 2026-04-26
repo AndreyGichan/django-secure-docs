@@ -7,9 +7,8 @@ from dj_rest_auth.jwt_auth import get_refresh_view
 from . import views
 from .serializers import CustomRegisterSerializer
 
-
 router = DefaultRouter()
-router.register(r'', views.UsersViewSet, basename='users')
+router.register(r'users', views.UsersViewSet, basename='users')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { searchUsers } from "@/lib/api/auth"
+import { searchUsers, deleteUser, updateUser } from "@/lib/api/auth"
 
 interface User {
     id: string
@@ -75,19 +75,8 @@ interface User {
     date_joined: string
     last_login: string | null
     documentsCount: number
-    createdAt: string
 }
 
-// const users: User[] = [
-//   { id: "1", name: "Ivanov Ivan Petrovich", email: "ivanov@company.com", role: "admin", department: "IT", status: "active", documentsCount: 156, lastLogin: "2 hours ago", createdAt: "2024-01-15", avatarColor: "from-violet-500 to-purple-600" },
-//   { id: "2", name: "Petrova Anna Sergeevna", email: "petrova@company.com", role: "manager", department: "Finance", status: "active", documentsCount: 89, lastLogin: "5 hours ago", createdAt: "2024-02-20", avatarColor: "from-cyan-500 to-blue-600" },
-//   { id: "3", name: "Sidorov Kirill Dmitrievich", email: "sidorov@company.com", role: "user", department: "Legal", status: "active", documentsCount: 234, lastLogin: "1 day ago", createdAt: "2024-03-10", avatarColor: "from-emerald-500 to-green-600" },
-//   { id: "4", name: "Kozlova Maria Alexandrovna", email: "kozlova@company.com", role: "manager", department: "HR", status: "active", documentsCount: 67, lastLogin: "3 days ago", createdAt: "2024-04-05", avatarColor: "from-amber-500 to-orange-600" },
-//   { id: "5", name: "Novikov Dmitry Nikolaevich", email: "novikov@company.com", role: "user", department: "Marketing", status: "inactive", documentsCount: 12, lastLogin: "2 weeks ago", createdAt: "2024-05-12", avatarColor: "from-rose-500 to-pink-600" },
-//   { id: "6", name: "Smirnova Elena Viktorovna", email: "smirnova@company.com", role: "user", department: "Sales", status: "active", documentsCount: 45, lastLogin: "6 hours ago", createdAt: "2024-06-18", avatarColor: "from-indigo-500 to-violet-600" },
-//   { id: "7", name: "Kuznetsov Alexey Igorevich", email: "kuznetsov@company.com", role: "user", department: "IT", status: "blocked", documentsCount: 0, lastLogin: "1 month ago", createdAt: "2024-07-22", avatarColor: "from-slate-500 to-gray-600" },
-//   { id: "8", name: "Morozova Tatiana Olegovna", email: "morozova@company.com", role: "manager", department: "Finance", status: "active", documentsCount: 178, lastLogin: "1 hour ago", createdAt: "2024-08-30", avatarColor: "from-teal-500 to-cyan-600" },
-// ]
 
 function getRoleBadge(role: string) {
     switch (role) {
@@ -165,6 +154,13 @@ export default function UsersPage() {
     const [page, setPage] = useState(1)
     const [pageSize] = useState(10)
     const [totalCount, setTotalCount] = useState(0)
+    const [deleteUserTarget, setDeleteUserTarget] = useState<User | null>(null)
+    const [deleteOpen, setDeleteOpen] = useState(false)
+    const [editUserOpen, setEditUserOpen] = useState(false)
+    const [editUser, setEditUser] = useState<User | null>(null)
+    const [editName, setEditName] = useState("")
+    const [editEmail, setEditEmail] = useState("")
+    const [editRole, setEditRole] = useState<"admin" | "manager" | "employee">("employee")
 
     useEffect(() => {
         const delay = setTimeout(() => {
@@ -249,69 +245,57 @@ export default function UsersPage() {
         return pages
     }
 
+    const handleDeleteUser = async () => {
+        if (!deleteUserTarget) return
+
+        try {
+            await deleteUser(deleteUserTarget.id)
+
+            setUsers(prev => prev.filter(u => u.id !== deleteUserTarget.id))
+
+            setDeleteOpen(false)
+            setDeleteUserTarget(null)
+
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    const handleEditUser = (user: User) => {
+        setEditUser(user)
+        setEditName(user.full_name)
+        setEditEmail(user.email)
+        setEditRole(user.role)
+        setEditUserOpen(true)
+    }
+
+    const handleSaveEditUser = async () => {
+        if (!editUser) return
+
+        try {
+            const res = await updateUser(editUser.id, {
+                full_name: editName,
+                email: editEmail,
+                role: editRole,
+            })
+
+            setUsers(prev =>
+                prev.map(u => u.id === editUser.id ? res.data : u)
+            )
+
+            setEditUserOpen(false)
+            setEditUser(null)
+        } catch (e) {
+            console.error("Ошибка обновления пользователя", e)
+        }
+    }
+
     return (
         <div className="flex flex-1 flex-col">
             <PageHeader
                 title="Users"
                 breadcrumbs={[{ label: "Users" }]}
             >
-                <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
-                    <DialogTrigger asChild>
-                        <Button size="sm" className="h-8 bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0">
-                            <Plus className="mr-2 h-3.5 w-3.5" />
-                            Add User
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-card text-card-foreground border-border max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="text-foreground">Add New User</DialogTitle>
-                            <DialogDescription className="text-muted-foreground">
-                                Create a new user account. The user will receive an email with login credentials.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex flex-col gap-4 py-4">
-                            <div className="flex flex-col gap-2">
-                                <Label className="text-xs text-muted-foreground">Full Name</Label>
-                                <Input
-                                    placeholder="Ivanov Ivan Petrovich"
-                                    className="bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
-                                />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <Label className="text-xs text-muted-foreground">Email</Label>
-                                <Input
-                                    type="email"
-                                    placeholder="user@company.com"
-                                    className="bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex flex-col gap-2">
-                                    <Label className="text-xs text-muted-foreground">Role</Label>
-                                    <Select defaultValue="user">
-                                        <SelectTrigger className="bg-secondary/50 border-border text-foreground">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-popover text-popover-foreground border-border">
-                                            <SelectItem value="user">Employee</SelectItem>
-                                            <SelectItem value="manager">Manager</SelectItem>
-                                            <SelectItem value="admin">Admin</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="ghost" onClick={() => setAddUserOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
-                                Cancel
-                            </Button>
-                            <Button className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0">
-                                Create User
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
             </PageHeader>
 
             <div className="flex-1 overflow-auto p-6">
@@ -409,15 +393,17 @@ export default function UsersPage() {
                                             <DropdownMenuContent align="end" className="bg-popover text-popover-foreground border-border w-48">
                                                 <DropdownMenuItem className="text-xs">
                                                     <Eye className="mr-2 h-3.5 w-3.5" />
-                                                    View Details
+                                                    Сведения
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-xs">
+                                                <DropdownMenuItem
+                                                    className="text-xs"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleEditUser(user)
+                                                    }}
+                                                >
                                                     <Edit className="mr-2 h-3.5 w-3.5" />
-                                                    Edit User
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-xs">
-                                                    <Mail className="mr-2 h-3.5 w-3.5" />
-                                                    Send Email
+                                                    Редактировать
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator className="bg-border" />
                                                 <DropdownMenuItem
@@ -428,12 +414,19 @@ export default function UsersPage() {
                                                     }}
                                                 >
                                                     <KeyRound className="mr-2 h-3.5 w-3.5" />
-                                                    Reset Password
+                                                    Сбросить пароль
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator className="bg-border" />
-                                                <DropdownMenuItem className="text-xs text-destructive">
+                                                <DropdownMenuItem
+                                                    className="text-xs text-destructive"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setDeleteUserTarget(user)
+                                                        setDeleteOpen(true)
+                                                    }}
+                                                >
                                                     <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                                    Delete User
+                                                    Удалить
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -443,6 +436,43 @@ export default function UsersPage() {
                         </TableBody>
                     </Table>
                 </div>
+
+                <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                    <DialogContent className="bg-card text-card-foreground border-border max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Delete User</DialogTitle>
+                            <DialogDescription>
+                                Вы уверены, что хотите удалить{" "}
+                                <span className="font-mono text-foreground">
+                                    {deleteUserTarget?.full_name}
+                                </span>?
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="flex items-center gap-3 py-3">
+                            <Trash2 className="h-7 w-7 text-destructive" />
+                            <span className="text-xs text-muted-foreground">
+                                Пользователь будет удален без возможности восстановления.
+                            </span>
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                variant="ghost"
+                                className="text-muted-foreground hover:text-foreground hover:bg-secondary tracking-wide font-mono"
+                                onClick={() => setDeleteOpen(false)}
+                            >
+                                Отмена
+                            </Button>
+                            <Button
+                                className="bg-gradient-to-r from-rose-500 to-red-600 text-primary-foreground hover:opacity-90 border-0 tracking-wide font-mono"
+                                onClick={handleDeleteUser}
+                            >
+                                Удалить
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Pagination */}
                 <div className="mt-4 max-w-7xl mx-auto flex items-center justify-between">
@@ -507,7 +537,7 @@ export default function UsersPage() {
                                     </Avatar>
                                     <div>
                                         <DialogTitle className="text-foreground">{selectedUser.full_name}</DialogTitle>
-                                        <DialogDescription className="text-muted-foreground flex items-center gap-2">
+                                        <DialogDescription className="text-muted-foreground flex items-center gap-1">
                                             <Mail className="h-3 w-3" />
                                             {selectedUser.email}
                                         </DialogDescription>
@@ -526,11 +556,11 @@ export default function UsersPage() {
                                 </div>
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">Last Login</span>
-                                    <span className="text-foreground">{formatDateTime(selectedUser.last_login)}</span>
+                                    <span className="text-foreground font-mono tracking-wide">{formatDateTime(selectedUser.last_login)}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">Created</span>
-                                    <span className="text-foreground font-mono">{selectedUser.createdAt}</span>
+                                    <span className="text-foreground font-mono tracking-wide">{formatDateTime(selectedUser.date_joined)}</span>
                                 </div>
                             </div>
                             <Separator className="bg-border/50" />
@@ -544,12 +574,18 @@ export default function UsersPage() {
                                         handleResetPassword(selectedUser)
                                     }}
                                 >
-                                    <KeyRound className="mr-2 h-3 w-3" />
-                                    Reset Password
+                                    <KeyRound className="h-3 w-3" />
+                                    Сбросить пароль
                                 </Button>
-                                <Button size="sm" className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 text-xs">
-                                    <Edit className="mr-2 h-3 w-3" />
-                                    Edit User
+                                <Button
+                                    size="sm"
+                                    className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0 text-xs"
+                                    onClick={() => {
+                                        setDetailOpen(false)
+                                        handleEditUser(selectedUser)
+                                    }}
+                                >                                    <Edit className="h-3 w-3" />
+                                    Редактировать
                                 </Button>
                             </DialogFooter>
                         </>
@@ -580,8 +616,8 @@ export default function UsersPage() {
                             <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
                             <div className="flex flex-col gap-1">
                                 <span className="text-xs font-medium text-amber-400">Security Notice</span>
-                                <span className="text-[11px] text-amber-400/80">
-                                    The user will need to use this new password to log in. Make sure to securely share it with them.
+                                <span className="text-[11px] text-amber-400/80 tracking-wide">
+                                    Пользователю потребуется использовать этот новый пароль для входа в систему. Обязательно передайте его ему в безопасном режиме.
                                 </span>
                             </div>
                         </div>
@@ -596,8 +632,8 @@ export default function UsersPage() {
                                     onClick={generatePassword}
                                     className="h-12 border-dashed border-2 border-border bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/50 hover:border-violet-500/30"
                                 >
-                                    <KeyRound className="mr-2 h-4 w-4" />
-                                    Generate Secure Password
+                                    <KeyRound className="mr-1 h-4 w-4" />
+                                    Создать безопасный пароль
                                 </Button>
                             ) : (
                                 <div className="flex flex-col gap-2">
@@ -665,7 +701,7 @@ export default function UsersPage() {
                             onClick={() => setResetPasswordOpen(false)}
                             className="text-muted-foreground hover:text-foreground hover:bg-secondary"
                         >
-                            Cancel
+                            Отмена
                         </Button>
                         <Button
                             className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0"
@@ -674,7 +710,137 @@ export default function UsersPage() {
                                 setResetPasswordOpen(false)
                             }}
                         >
-                            Reset Password
+                            Сбросить пароль
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit User Dialog */}
+            <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
+                <DialogContent className="bg-card text-card-foreground border-border max-w-md">
+                    <DialogHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-cyan-500/20 border border-violet-500/20">
+                                <UserCog className="h-6 w-6 text-violet-400" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-foreground">Edit User</DialogTitle>
+                                <DialogDescription className="text-muted-foreground text-xs">
+                                    Update user information
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="flex flex-col gap-4 py-4">
+                        {/* Avatar preview */}
+                        {editUser && (
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary/30 border border-border/50">
+                                <Avatar className="h-10 w-10">
+                                    <AvatarFallback className={`bg-gradient-to-br ${getAvatarColor(editName || editUser.full_name)} text-xs font-bold text-white`}>
+                                        {getInitials(editName || editUser.full_name)}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-medium text-foreground">{editName || editUser.full_name}</span>
+                                    <span className="text-[10px] text-muted-foreground">{editEmail || editUser.email}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <Separator className="bg-border/50" />
+
+                        {/* Name */}
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-xs text-muted-foreground">Full Name</Label>
+                            <Input
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                placeholder="Ivanov Ivan Petrovich"
+                                className="bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
+                            />
+                        </div>
+
+                        {/* Email */}
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-xs text-muted-foreground">Email</Label>
+                            <Input
+                                type="email"
+                                value={editEmail}
+                                onChange={(e) => setEditEmail(e.target.value)}
+                                placeholder="user@company.com"
+                                className="bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
+                            />
+                        </div>
+
+                        {/* Role */}
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-xs text-muted-foreground">Role</Label>
+                            <Select value={editRole} onValueChange={(value: "admin" | "manager" | "employee") => setEditRole(value)}>
+                                <SelectTrigger className="bg-secondary/50 border-border text-foreground">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-popover text-popover-foreground border-border">
+                                    <SelectItem value="employee" className="text-xs tracking-wide">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                                            Сотрудник
+                                        </div>
+                                    </SelectItem>
+                                    <SelectItem value="manager" className="text-xs tracking-wide">
+                                        <div className="flex items-center gap-2">
+                                            <Shield className="h-3.5 w-3.5 text-cyan-400" />
+                                            Менеджер
+                                        </div>
+                                    </SelectItem>
+                                    <SelectItem value="admin" className="text-xs tracking-wide">
+                                        <div className="flex items-center gap-2">
+                                            <ShieldCheck className="h-3.5 w-3.5 text-violet-400" />
+                                            Администратор
+                                        </div>
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                        </div>
+
+                        {/* Info about what changed */}
+                        {editUser && (editName !== editUser.full_name || editEmail !== editUser.email || editRole !== editUser.role) && (
+                            <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Edit className="h-3.5 w-3.5 text-violet-400" />
+                                    <span className="text-xs font-medium text-violet-400">Изменения, которые будут сохранены</span>
+                                </div>
+                                <div className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                                    {editName !== editUser.full_name && (
+                                        <span>Name: <span className="text-rose-400 line-through">{editUser.full_name}</span> <span className="text-emerald-400">{editName}</span></span>
+                                    )}
+                                    {editEmail !== editUser.email && (
+                                        <span>Email: <span className="text-rose-400 line-through">{editUser.email}</span> <span className="text-emerald-400">{editEmail}</span></span>
+                                    )}
+                                    {editRole !== editUser.role && (
+                                        <span>Role: <span className="text-rose-400 line-through capitalize">{editUser.role}</span> <span className="text-emerald-400 capitalize">{editRole}</span></span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setEditUserOpen(false)}
+                            className="text-muted-foreground hover:text-foreground hover:bg-secondary"
+                        >
+                            Отмена
+                        </Button>
+                        <Button
+                            className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0"
+                            disabled={!editName || !editEmail}
+                            onClick={handleSaveEditUser}
+                        >
+                            Сохранить изменения
                         </Button>
                     </DialogFooter>
                 </DialogContent>

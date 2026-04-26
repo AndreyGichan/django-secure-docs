@@ -564,7 +564,7 @@ export default function DocumentsPage() {
 
       try {
         setUserSearchLoading(true);
-        const res = await searchUsers(userSearch);
+        const res = await searchUsers({ search: userSearch });
         setUserResults(res.data);
       } catch (error) {
         console.error("User search error", error);
