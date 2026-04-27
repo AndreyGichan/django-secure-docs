@@ -864,7 +864,10 @@ export default function DocumentsPage() {
                           </div>
 
                           <div className="flex flex-col flex-1 min-w-0">
-                            <span className="text-[12px] font-medium text-emerald-400 truncate">
+                            <span
+                              className="text-[12px] font-medium text-emerald-400 truncate max-w-[220px] cursor-default select-none"
+                              title={uploadFile.name}
+                            >
                               {uploadFile.name}
                             </span>
                             <span className="text-[10px] text-emerald-400/50 font-mono">
@@ -903,7 +906,7 @@ export default function DocumentsPage() {
                       placeholder="Название документа"
                       value={uploadTitle}
                       onChange={(e) => setUploadTitle(e.target.value)}
-                      className="bg-secondary/50 border-border text-foreground font-mono"
+                      className="bg-secondary/50 border-border text-foreground font-mono overflow-hidden text-ellipsis whitespace-nowrap"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
@@ -1114,7 +1117,10 @@ export default function DocumentsPage() {
                     <div className="flex items-center gap-3">
                       {getFileIcon(doc.type)}
                       <div className="flex flex-col">
-                        <span className="text-xs font-medium text-foreground">
+                        <span
+                          className="text-xs font-medium text-foreground truncate max-w-[200px]"
+                          title={`${doc.title}.${doc.type}`}
+                        >
                           {doc.title}.{doc.type}
                         </span>
                         <span className="text-[10px] text-muted-foreground font-mono">
