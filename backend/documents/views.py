@@ -63,7 +63,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
             shared_with_count=Count(
                 'access_list',
                 filter=Q(access_list__revoked_at__isnull=True) &
-                    (Q(access_list__expires_at__isnull=True) | Q(access_list__expires_at__gte=timezone.now()))
+                    (Q(access_list__expires_at__isnull=True) | Q(access_list__expires_at__gte=timezone.now())) &
+                    ~Q(access_list__user=F('owner'))
             )
         )
 

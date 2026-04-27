@@ -48,7 +48,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     def get_shared_with(self, obj):
         return obj.access_list.filter(
             revoked_at__isnull=True
-        ).count()
+        ).exclude(user=obj.owner).count()
 
     def get_version(self, obj):
         # latest_version = obj.versions.order_by("-version_number").first()
