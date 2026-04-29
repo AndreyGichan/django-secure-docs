@@ -341,8 +341,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document = link.document_version.document
         user = request.user
 
+        access = DocumentAccess.objects.filter(
+            document=document,
+            user=user,
+            revoked_at__isnull=True
+        ).first()
+
+        if access is None:
+            return Response({"detail": "No access"}, status=status.HTTP_403_FORBIDDEN)
+
+        if access.role != "editor":
+            return Response({"detail": "No download permission"}, status=status.HTTP_403_FORBIDDEN)
+
         if document.status == "draft" and document.owner != user:
-            return Response({"detail": "Only owner can download draft document"}, status=403)
+            return Response({"detail": "Only owner can download draft document"}, status=status.HTTP_403_FORBIDDEN)
 
         file = link.document_version.file
 

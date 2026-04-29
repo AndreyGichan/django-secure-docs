@@ -249,9 +249,10 @@ export function ShareDocumentDialog({
         }
 
         const timeout = setTimeout(() => {
-            searchUsers(searchQuery)
+            searchUsers({ search: searchQuery })
                 .then(res => {
-                    const users: User[] = res.data.map((u: any, idx: number) => ({
+                    const results = res.data?.results ?? []
+                    const users: User[] = results.map((u: any, idx: number) => ({
                         id: u.id,
                         name: u.full_name || u.name,
                         email: u.email,
@@ -260,6 +261,7 @@ export function ShareDocumentDialog({
                             : "NA",
                         color: AVATAR_COLORS[idx % AVATAR_COLORS.length],
                         publicKey: u.public_key,
+                        
                     }))
                     setAllUsers(users)
                 })

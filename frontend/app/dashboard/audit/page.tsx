@@ -405,7 +405,12 @@ export default function AuditPage() {
                   <TableCell>{getActionBadge(log.action)}</TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="text-xs text-foreground">{log.targetName}</span>
+                      <span
+                        className="text-xs text-foreground truncate max-w-[220px] cursor-default"
+                        title={log.targetName}
+                      >
+                        {log.targetName}
+                      </span>
                       <span className="text-[10px] text-muted-foreground font-mono">{log.targetType} / {log.targetId}</span>
                     </div>
                   </TableCell>

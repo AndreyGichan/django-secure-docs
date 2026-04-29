@@ -1,6 +1,25 @@
 "use client"
 
-import { FileText, Users, Download, Share2, Shield, Activity, ArrowUpRight, TrendingUp } from "lucide-react"
+
+import {
+  FileText,
+  Users,
+  Download,
+  Share2,
+  Shield,
+  Activity,
+  ArrowUpRight,
+  TrendingUp,
+  Clock,
+  Eye,
+  FileUp,
+  FolderOpen,
+  Key,
+  Lock,
+  CheckCircle2,
+  AlertCircle,
+  Calendar
+} from "lucide-react"
 import {
   AreaChart,
   Area,
@@ -19,7 +38,17 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useUser } from "@/lib/user-context"
 
+// Admin data
 const dailyActivity = [
   { date: "01 Jan", actions: 124 },
   { date: "02 Jan", actions: 189 },
@@ -59,6 +88,37 @@ const topUsers = [
   { email: "novikov@co", actions: 72 },
 ]
 
+// User data
+const userActivity = [
+  { date: "Mon", views: 12, downloads: 3 },
+  { date: "Tue", views: 18, downloads: 5 },
+  { date: "Wed", views: 8, downloads: 2 },
+  { date: "Thu", views: 24, downloads: 8 },
+  { date: "Fri", views: 15, downloads: 4 },
+  { date: "Sat", views: 6, downloads: 1 },
+  { date: "Sun", views: 3, downloads: 0 },
+]
+
+const myDocuments = [
+  { name: "Q4_Financial_Report.pdf", type: "PDF", size: "2.4 MB", updated: "2 hours ago", status: "active" },
+  { name: "Project_Proposal_v2.docx", type: "DOCX", size: "1.1 MB", updated: "Yesterday", status: "active" },
+  { name: "Meeting_Notes_Jan.pdf", type: "PDF", size: "0.8 MB", updated: "3 days ago", status: "active" },
+  { name: "Budget_Template.xlsx", type: "XLSX", size: "0.5 MB", updated: "1 week ago", status: "archived" },
+]
+
+const sharedWithMe = [
+  { name: "Company_Policy_2026.pdf", owner: "HR Department", ownerInitials: "HR", permission: "view", expires: "30 days", color: "from-violet-500 to-purple-600" },
+  { name: "Q1_Targets.xlsx", owner: "Sidorov K.", ownerInitials: "SK", permission: "edit", expires: "14 days", color: "from-cyan-500 to-teal-600" },
+  { name: "NDA_Template.pdf", owner: "Legal Team", ownerInitials: "LT", permission: "view", expires: "Never", color: "from-emerald-500 to-green-600" },
+]
+
+const recentUserActivity = [
+  { action: "Viewed", target: "Q4_Financial_Report.pdf", time: "10 min ago", icon: Eye },
+  { action: "Downloaded", target: "Project_Proposal_v2.docx", time: "2 hours ago", icon: Download },
+  { action: "Uploaded", target: "Meeting_Notes_Jan.pdf", time: "Yesterday", icon: FileUp },
+  { action: "Shared", target: "Budget_Template.xlsx", time: "3 days ago", icon: Share2 },
+]
+
 const AVATAR_COLORS = [
   "from-violet-500 to-purple-600",
   "from-cyan-500 to-teal-600",
@@ -94,7 +154,542 @@ function CustomTooltipArea({ active, payload, label }: any) {
   return null
 }
 
+function CustomTooltipUser({ active, payload, label }: any) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-xl border border-violet-500/20 bg-popover/95 backdrop-blur-sm px-4 py-3 text-xs text-popover-foreground shadow-xl shadow-black/30">
+        <p className="font-semibold text-foreground">{label}</p>
+        {payload.map((item: any, index: number) => (
+          <p key={index} className="text-muted-foreground mt-1 flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${index === 0 ? 'bg-violet-500' : 'bg-cyan-400'}`} />
+            {item.name}: <span className="font-mono font-semibold text-foreground">{item.value}</span>
+          </p>
+        ))}
+      </div>
+    )
+  }
+  return null
+}
+
+function getFileIcon(type: string) {
+  switch (type) {
+    case "PDF": return "bg-rose-500/20 text-rose-400"
+    case "DOCX": return "bg-blue-500/20 text-blue-400"
+    case "XLSX": return "bg-emerald-500/20 text-emerald-400"
+    default: return "bg-secondary text-muted-foreground"
+  }
+}
+
+// Admin Dashboard Component
+function AdminDashboard() {
+  return (
+    <>
+      {/* Welcome banner */}
+      <div className="max-w-7xl mx-auto relative mb-6 overflow-hidden rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-600/10 via-purple-600/5 to-cyan-500/10 p-6">
+        <div className="absolute top-0 right-0 h-full w-1/3 bg-gradient-to-l from-cyan-500/10 to-transparent" />
+        <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-violet-500/10 blur-3xl" />
+        <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Welcome back, Admin</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {"You have "}
+              <span className="text-violet-400 font-semibold">23 new documents</span>
+              {" and "}
+              <span className="text-cyan-400 font-semibold">5 pending reviews</span>
+              {" today."}
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+              <TrendingUp className="h-4 w-4 text-emerald-400" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-emerald-400/70">Activity</span>
+                <span className="text-xs font-bold text-emerald-400">+18%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="max-w-7xl mx-auto grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard title="Documents" value="1,284" change="+23 this week" changeType="positive" icon={FileText} accentColor="0" />
+        <StatCard title="Users" value="60" change="+3 this month" changeType="positive" icon={Users} accentColor="1" />
+        <StatCard title="Downloads" value="3,456" change="+12% vs last week" changeType="positive" icon={Download} accentColor="2" />
+        <StatCard title="Shared" value="892" change="156 this week" changeType="neutral" icon={Share2} accentColor="3" />
+        <StatCard title="Audit Events" value="12,847" change="Last 30 days" changeType="neutral" icon={Shield} accentColor="4" />
+        {/* <StatCard title="Active Now" value="24" change="Online users" changeType="neutral" icon={Activity} accentColor="5" /> */}
+      </div>
+
+      {/* Charts Row */}
+      <div className="max-w-7xl mx-auto mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Daily Activity Chart */}
+        <div className="col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-violet-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Daily Activity</h3>
+                <p className="text-xs text-muted-foreground">Actions per day for the last 14 days</p>
+              </div>
+              <Badge variant="outline" className="text-[10px] font-mono bg-violet-500/10 text-violet-400 border-violet-500/20">
+                Last 14 days
+              </Badge>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={dailyActivity}>
+                <defs>
+                  <linearGradient id="gradientArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.4} />
+                    <stop offset="50%" stopColor="hsl(280, 70%, 55%)" stopOpacity={0.15} />
+                    <stop offset="100%" stopColor="hsl(190, 95%, 39%)" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="strokeGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="hsl(262, 83%, 58%)" />
+                    <stop offset="100%" stopColor="hsl(190, 95%, 50%)" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 12%)" vertical={false} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
+                <Tooltip content={<CustomTooltipArea />} />
+                <Area type="monotone" dataKey="actions" stroke="url(#strokeGrad)" strokeWidth={2.5} fill="url(#gradientArea)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Roles Distribution */}
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Roles Distribution</h3>
+              <p className="text-xs text-muted-foreground">Users by role</p>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={rolesData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={75}
+                  paddingAngle={4}
+                  dataKey="count"
+                  nameKey="role"
+                  stroke="none"
+                >
+                  {rolesData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-col gap-3 mt-2">
+              {rolesData.map((item) => (
+                <div key={item.role} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-3 w-3 rounded-md" style={{ backgroundColor: item.fill }} />
+                    <span className="text-xs text-muted-foreground">{item.role}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-semibold text-foreground">{item.count}</span>
+                    <span className="text-[10px] text-muted-foreground/50">users</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Row */}
+      <div className=" max-w-7xl mx-auto mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Recent Actions */}
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -top-16 -left-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Recent Actions</h3>
+                <p className="text-xs text-muted-foreground">Latest audit events</p>
+              </div>
+              <button className="flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors">
+                View all <ArrowUpRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {recentActions.map((action, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-xl bg-secondary/30 px-3.5 py-3 border border-transparent hover:border-border/50 transition-all duration-200 hover:bg-secondary/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br ${AVATAR_COLORS[i]} shadow-sm`}>
+                      <span className="text-[10px] font-bold text-white">
+                        {action.avatar}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-foreground">
+                        {action.user}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {action.target}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] font-mono ${getActionBadgeClasses(action.action)}`}
+                    >
+                      {action.action}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground/60 w-12 text-right">
+                      {action.time}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Top Active Users */}
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Top Active Users</h3>
+                <p className="text-xs text-muted-foreground">Most actions this month</p>
+              </div>
+              <button className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors">
+                Details <ArrowUpRight className="h-3 w-3" />
+              </button>
+            </div>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={topUsers} layout="vertical" barSize={20}>
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="hsl(262, 83%, 58%)" />
+                    <stop offset="50%" stopColor="hsl(280, 70%, 55%)" />
+                    <stop offset="100%" stopColor="hsl(190, 95%, 45%)" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 12%)" horizontal={false} />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
+                <YAxis type="category" dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 10 }} width={90} />
+                <Tooltip content={<CustomTooltipArea />} />
+                <Bar dataKey="actions" fill="url(#barGradient)" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// User Dashboard Component
+function UserDashboard() {
+  return (
+    <>
+      {/* Welcome banner */}
+      <div className="relative mb-6 overflow-hidden rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-600/10 via-purple-600/5 to-cyan-500/10 p-6">
+        <div className="absolute top-0 right-0 h-full w-1/3 bg-gradient-to-l from-cyan-500/10 to-transparent" />
+        <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-violet-500/10 blur-3xl" />
+        <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Welcome, Ivanov Ivan</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {"You have "}
+              <span className="text-violet-400 font-semibold">4 documents</span>
+              {" and "}
+              <span className="text-cyan-400 font-semibold">3 shared with you</span>
+              {"."}
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-emerald-400/70">Key Status</span>
+                <span className="text-xs font-bold text-emerald-400">Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="My Documents" value="4" change="2 this week" changeType="positive" icon={FolderOpen} accentColor="0" />
+        <StatCard title="Shared with Me" value="3" change="1 new" changeType="positive" icon={Share2} accentColor="1" />
+        <StatCard title="Downloads" value="28" change="This month" changeType="neutral" icon={Download} accentColor="2" />
+        <StatCard title="Storage Used" value="4.8 GB" change="48% of quota" changeType="neutral" icon={FileText} accentColor="3" />
+      </div>
+
+      {/* Main content */}
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Activity Chart */}
+        <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-violet-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">My Activity</h3>
+                <p className="text-xs text-muted-foreground">Views and downloads this week</p>
+              </div>
+              <Badge variant="outline" className="text-[10px] font-mono bg-violet-500/10 text-violet-400 border-violet-500/20">
+                This week
+              </Badge>
+            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={userActivity} barGap={4}>
+                <defs>
+                  <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.8} />
+                    <stop offset="100%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.3} />
+                  </linearGradient>
+                  <linearGradient id="downloadsGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(190, 95%, 45%)" stopOpacity={0.8} />
+                    <stop offset="100%" stopColor="hsl(190, 95%, 45%)" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 12%)" vertical={false} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
+                <Tooltip content={<CustomTooltipUser />} />
+                <Bar dataKey="views" name="Views" fill="url(#viewsGradient)" radius={[4, 4, 0, 0]} barSize={16} />
+                <Bar dataKey="downloads" name="Downloads" fill="url(#downloadsGradient)" radius={[4, 4, 0, 0]} barSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-center gap-6 mt-3">
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded bg-violet-500" />
+                <span className="text-[10px] text-muted-foreground">Views</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded bg-cyan-500" />
+                <span className="text-[10px] text-muted-foreground">Downloads</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Recent Activity</h3>
+              <p className="text-xs text-muted-foreground">Your latest actions</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              {recentUserActivity.map((item, i) => (
+                <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-secondary/30 transition-colors">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${item.action === "Viewed" ? "bg-violet-500/15 text-violet-400" :
+                      item.action === "Downloaded" ? "bg-amber-500/15 text-amber-400" :
+                        item.action === "Uploaded" ? "bg-emerald-500/15 text-emerald-400" :
+                          "bg-cyan-500/15 text-cyan-400"
+                    }`}>
+                    <item.icon className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="text-xs font-medium text-foreground truncate">{item.target}</span>
+                    <span className="text-[10px] text-muted-foreground">{item.action}</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground/60 shrink-0">{item.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Documents and Shared */}
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* My Documents */}
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -top-16 -left-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">My Documents</h3>
+                <p className="text-xs text-muted-foreground">Recently updated files</p>
+              </div>
+              <button className="flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors">
+                View all <ArrowUpRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {myDocuments.map((doc, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-xl bg-secondary/30 px-3.5 py-3 border border-transparent hover:border-border/50 transition-all duration-200 hover:bg-secondary/50 cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${getFileIcon(doc.type)}`}>
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-foreground">{doc.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">{doc.size}</span>
+                        <span className="text-[10px] text-muted-foreground/40">•</span>
+                        <span className="text-[10px] text-muted-foreground">{doc.updated}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className={`text-[9px] font-mono ${doc.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-secondary text-muted-foreground border-border"
+                    }`}>
+                    {doc.type}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Shared with Me */}
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Shared with Me</h3>
+                <p className="text-xs text-muted-foreground">Documents you have access to</p>
+              </div>
+              <button className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors">
+                View all <ArrowUpRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {sharedWithMe.map((doc, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-xl bg-secondary/30 px-3.5 py-3 border border-transparent hover:border-border/50 transition-all duration-200 hover:bg-secondary/50 cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className={`bg-gradient-to-br ${doc.color} text-[10px] font-bold text-white`}>
+                        {doc.ownerInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-foreground">{doc.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">{doc.owner}</span>
+                        <span className="text-[10px] text-muted-foreground/40">•</span>
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-2.5 w-2.5" />
+                          {doc.expires}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className={`text-[9px] font-mono ${doc.permission === "edit" ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" : "bg-violet-500/10 text-violet-400 border-violet-500/20"
+                    }`}>
+                    {doc.permission === "edit" ? "Edit" : "View"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions & Security */}
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Quick Actions */}
+        <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -top-16 -right-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Quick Actions</h3>
+              <p className="text-xs text-muted-foreground">Frequently used features</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-violet-500/30 hover:bg-violet-500/10 transition-all group">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 group-hover:scale-110 transition-transform">
+                  <FileUp className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-medium text-foreground">Upload</span>
+              </button>
+              <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-cyan-500/30 hover:bg-cyan-500/10 transition-all group">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400 group-hover:scale-110 transition-transform">
+                  <Share2 className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-medium text-foreground">Share</span>
+              </button>
+              <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-emerald-500/30 hover:bg-emerald-500/10 transition-all group">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 group-hover:scale-110 transition-transform">
+                  <Key className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-medium text-foreground">Decrypt</span>
+              </button>
+              <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-amber-500/30 hover:bg-amber-500/10 transition-all group">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 group-hover:scale-110 transition-transform">
+                  <FolderOpen className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-medium text-foreground">Browse</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Security Status */}
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+          <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-emerald-500/5 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Security Status</h3>
+              <p className="text-xs text-muted-foreground">Your encryption keys</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
+                  <Lock className="h-4 w-4 text-emerald-400" />
+                </div>
+                <div className="flex flex-col flex-1">
+                  <span className="text-xs font-medium text-foreground">Private Key</span>
+                  <span className="text-[10px] text-emerald-400">Active</span>
+                </div>
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              </div>
+              <div className="flex flex-col gap-2 p-3 rounded-xl bg-secondary/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Key created</span>
+                  <span className="text-[10px] font-mono text-foreground">Jan 15, 2026</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Algorithm</span>
+                  <span className="text-[10px] font-mono text-foreground">RSA-4096</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Fingerprint</span>
+                  <span className="text-[10px] font-mono text-muted-foreground">A7:3F:...92:1B</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function DashboardPage() {
+  const { role, loading } = useUser()
+  const isAdmin = role === "admin"
+
+  if (loading) return <div>Loading...</div>
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -103,213 +698,9 @@ export default function DashboardPage() {
       />
 
       <div className="flex-1 overflow-auto p-6">
-        {/* Welcome banner */}
-        <div className="relative mb-6 overflow-hidden rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-600/10 via-purple-600/5 to-cyan-500/10 p-6">
-          <div className="absolute top-0 right-0 h-full w-1/3 bg-gradient-to-l from-cyan-500/10 to-transparent" />
-          <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-violet-500/10 blur-3xl" />
-          <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-cyan-500/10 blur-3xl" />
-          <div className="relative flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Welcome back, Admin</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {"You have "}
-                <span className="text-violet-400 font-semibold">23 new documents</span>
-                {" and "}
-                <span className="text-cyan-400 font-semibold">5 pending reviews</span>
-                {" today."}
-              </p>
-            </div>
-            <div className="hidden sm:flex items-center gap-3">
-              <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
-                <TrendingUp className="h-4 w-4 text-emerald-400" />
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-emerald-400/70">Activity</span>
-                  <span className="text-xs font-bold text-emerald-400">+18%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <StatCard title="Documents" value="1,284" change="+23 this week" changeType="positive" icon={FileText} accentColor="0" />
-          <StatCard title="Users" value="60" change="+3 this month" changeType="positive" icon={Users} accentColor="1" />
-          <StatCard title="Downloads" value="3,456" change="+12% vs last week" changeType="positive" icon={Download} accentColor="2" />
-          <StatCard title="Shared" value="892" change="156 this week" changeType="neutral" icon={Share2} accentColor="3" />
-          <StatCard title="Audit Events" value="12,847" change="Last 30 days" changeType="neutral" icon={Shield} accentColor="4" />
-          <StatCard title="Active Now" value="24" change="Online users" changeType="neutral" icon={Activity} accentColor="5" />
-        </div>
 
-        {/* Charts Row */}
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {/* Daily Activity Chart */}
-          <div className="col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
-            {/* Decorative corner glow */}
-            <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-violet-500/5 blur-3xl" />
-            <div className="relative">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Daily Activity</h3>
-                  <p className="text-xs text-muted-foreground">Actions per day for the last 14 days</p>
-                </div>
-                <Badge variant="outline" className="text-[10px] font-mono bg-violet-500/10 text-violet-400 border-violet-500/20">
-                  Last 14 days
-                </Badge>
-              </div>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={dailyActivity}>
-                  <defs>
-                    <linearGradient id="gradientArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.4} />
-                      <stop offset="50%" stopColor="hsl(280, 70%, 55%)" stopOpacity={0.15} />
-                      <stop offset="100%" stopColor="hsl(190, 95%, 39%)" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="strokeGrad" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="hsl(262, 83%, 58%)" />
-                      <stop offset="100%" stopColor="hsl(190, 95%, 50%)" />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 12%)" vertical={false} />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
-                  <Tooltip content={<CustomTooltipArea />} />
-                  <Area type="monotone" dataKey="actions" stroke="url(#strokeGrad)" strokeWidth={2.5} fill="url(#gradientArea)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Roles Distribution */}
-          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
-            <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
-            <div className="relative">
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-foreground">Roles Distribution</h3>
-                <p className="text-xs text-muted-foreground">Users by role</p>
-              </div>
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie
-                    data={rolesData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
-                    paddingAngle={4}
-                    dataKey="count"
-                    nameKey="role"
-                    stroke="none"
-                  >
-                    {rolesData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-col gap-3 mt-2">
-                {rolesData.map((item) => (
-                  <div key={item.role} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-3 w-3 rounded-md" style={{ backgroundColor: item.fill }} />
-                      <span className="text-xs text-muted-foreground">{item.role}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-foreground">{item.count}</span>
-                      <span className="text-[10px] text-muted-foreground/50">users</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Row */}
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* Recent Actions */}
-          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
-            <div className="absolute -top-16 -left-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />
-            <div className="relative">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Recent Actions</h3>
-                  <p className="text-xs text-muted-foreground">Latest audit events</p>
-                </div>
-                <button className="flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors">
-                  View all <ArrowUpRight className="h-3 w-3" />
-                </button>
-              </div>
-              <div className="flex flex-col gap-2.5">
-                {recentActions.map((action, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-xl bg-secondary/30 px-3.5 py-3 border border-transparent hover:border-border/50 transition-all duration-200 hover:bg-secondary/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br ${AVATAR_COLORS[i]} shadow-sm`}>
-                        <span className="text-[10px] font-bold text-white">
-                          {action.avatar}
-                        </span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-medium text-foreground">
-                          {action.user}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                          {action.target}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] font-mono ${getActionBadgeClasses(action.action)}`}
-                      >
-                        {action.action}
-                      </Badge>
-                      <span className="text-[10px] text-muted-foreground/60 w-12 text-right">
-                        {action.time}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Top Active Users */}
-          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
-            <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
-            <div className="relative">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Top Active Users</h3>
-                  <p className="text-xs text-muted-foreground">Most actions this month</p>
-                </div>
-                <button className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors">
-                  Details <ArrowUpRight className="h-3 w-3" />
-                </button>
-              </div>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={topUsers} layout="vertical" barSize={20}>
-                  <defs>
-                    <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="hsl(262, 83%, 58%)" />
-                      <stop offset="50%" stopColor="hsl(280, 70%, 55%)" />
-                      <stop offset="100%" stopColor="hsl(190, 95%, 45%)" />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 12%)" horizontal={false} />
-                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
-                  <YAxis type="category" dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 10 }} width={90} />
-                  <Tooltip content={<CustomTooltipArea />} />
-                  <Bar dataKey="actions" fill="url(#barGradient)" radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
+        {isAdmin ? <AdminDashboard /> : <UserDashboard />}
       </div>
     </div>
   )

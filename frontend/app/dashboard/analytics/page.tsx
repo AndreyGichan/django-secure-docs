@@ -363,7 +363,12 @@ export default function AnalyticsPage() {
                 <TableBody>
                   {documentActivity.map((doc, i) => (
                     <TableRow key={i} className="border-border/30 hover:bg-secondary/30">
-                      <TableCell className="text-xs font-medium text-foreground">{doc.title}</TableCell>
+                      <TableCell
+                        className="text-xs font-medium text-foreground truncate max-w-[220px] cursor-default"
+                        title={doc.title}
+                      >
+                        {doc.title}
+                      </TableCell>
                       <TableCell className="text-center">
                         <span className="font-mono text-xs text-muted-foreground">v{doc.total_versions}</span>
                       </TableCell>

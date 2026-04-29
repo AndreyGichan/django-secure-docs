@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { logout } from "@/lib/api/auth"
+import { useUser } from "@/lib/user-context"
+
 
 const mainNav = [
   {
@@ -79,17 +81,21 @@ const adminNav = [
     icon: BarChart3,
     color: "text-emerald-400",
   },
-  {
-    title: "Sharing Graph",
-    href: "/dashboard/graph",
-    icon: Share2,
-    color: "text-rose-400",
-  },
+  // {
+  //   title: "Sharing Graph",
+  //   href: "/dashboard/graph",
+  //   icon: Share2,
+  //   color: "text-rose-400",
+  // },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+   const { role, name, email, initials, loading  } = useUser()
+  
+  const isAdmin = role === "admin"
+  const shortName = name.split(" ").slice(0, 2).join(" ")
 
   const handleLogout = async () => {
     try {
@@ -100,6 +106,8 @@ export function AppSidebar() {
       router.replace("/")
     }
   }
+
+  if (loading) return null
 
   return (
     <Sidebar variant="sidebar" collapsible="icon">
@@ -124,9 +132,11 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
+           {role !== "employee" && (
           <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-semibold">
             Main
           </SidebarGroupLabel>
+           )}
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNav.map((item) => {
@@ -151,33 +161,35 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-semibold">
-            Administration
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminNav.map((item) => {
-                const isActive = pathname === item.href
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.title}
-                      className={isActive ? "bg-gradient-to-r from-violet-600/15 to-cyan-500/10 border border-violet-500/20 text-foreground" : ""}
-                    >
-                      <Link href={item.href}>
-                        <item.icon className={`h-4 w-4 ${isActive ? item.color : ""}`} />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-semibold">
+              Administration
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminNav.map((item) => {
+                  const isActive = pathname === item.href
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.title}
+                        className={isActive ? "bg-gradient-to-r from-violet-600/15 to-cyan-500/10 border border-violet-500/20 text-foreground" : ""}
+                      >
+                        <Link href={item.href}>
+                          <item.icon className={`h-4 w-4 ${isActive ? item.color : ""}`} />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Pro upgrade card */}
         {/* <div className="mx-3 mt-auto group-data-[collapsible=icon]:hidden">
@@ -212,15 +224,15 @@ export function AppSidebar() {
                 <SidebarMenuButton size="lg" className="w-full">
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarFallback className="rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 text-[10px] font-bold text-white">
-                      AD
+                     {initials}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-1 flex-col text-left group-data-[collapsible=icon]:hidden">
-                    <span className="text-xs font-semibold text-foreground">
-                      Admin User
+                    <span className="text-xs font-mono text-foreground">
+                      {shortName}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
-                      admin@company.com
+                      {email}
                     </span>
                   </div>
                   <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />

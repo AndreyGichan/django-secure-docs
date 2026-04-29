@@ -557,7 +557,7 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     const handler = setTimeout(async () => {
-      if (userSearch.trim().length < 1) {
+      if (userSearch.trim().length < 2) {
         setUserResults([]);
         return;
       }
@@ -565,7 +565,7 @@ export default function DocumentsPage() {
       try {
         setUserSearchLoading(true);
         const res = await searchUsers({ search: userSearch });
-        setUserResults(res.data);
+        setUserResults(res.data.results);
       } catch (error) {
         console.error("User search error", error);
       } finally {
@@ -1577,7 +1577,12 @@ export default function DocumentsPage() {
                         </>
                       ) : (
                         <>
-                          <DialogTitle className="text-foreground text-sm">{selectedDoc.title}.{selectedDoc.type}</DialogTitle>
+                          <DialogTitle
+                            className="text-foreground text-sm cursor-default truncate max-w-[350px]"
+                            title={`${selectedDoc.title}.${selectedDoc.type}`}
+                          >
+                            {selectedDoc.title}.{selectedDoc.type}
+                          </DialogTitle>
                           {currentUser?.email === selectedDoc?.owner_email && (
                             <Button
                               variant="ghost"

@@ -21,7 +21,7 @@ export const register = (data: RegisterData) => API.post("users/register/", data
 export const logout = () => API.post("users/logout/");
 export const getCurrentUser = () => API.get("users/profile/");
 export const searchUsers = (params: SearchUsersParams) =>
-  API.get("users/users", { params });
+  API.get("users/users/", { params });
 export const updateUserPublicKey = (publicKey: string) =>
   API.patch("users/profile/", { public_key: publicKey })
 export const changePassword = (oldPassword: string, newPassword: string, confirmPassword: string) =>
