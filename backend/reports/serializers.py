@@ -54,3 +54,11 @@ class GraphEdgeSerializer(serializers.Serializer):
 class CentralitySerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
     score = serializers.IntegerField()
+
+
+class DashboardStatsSerializer(serializers.Serializer):
+    documents = serializers.IntegerField()
+    users = serializers.IntegerField()
+    downloads = serializers.IntegerField()
+    shares = serializers.IntegerField()
+    audit_events = serializers.IntegerField()

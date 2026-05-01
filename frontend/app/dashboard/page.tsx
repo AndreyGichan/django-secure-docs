@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import {
   FileText,
@@ -18,7 +20,10 @@ import {
   Lock,
   CheckCircle2,
   AlertCircle,
-  Calendar
+  Calendar,
+  File,
+  FileSpreadsheet,
+  FileImage
 } from "lucide-react"
 import {
   AreaChart,
@@ -47,46 +52,49 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useUser } from "@/lib/user-context"
+import {
+  getTopUsers,
+  getDocumentActivity,
+  getDownloadActivity,
+  getSharingActivity,
+  getUserRolesDistribution,
+  getDailyActivity,
+} from "@/lib/api/reports"
+import { getAuditLogs } from "@/lib/api/audit"
+import { getDashboardStats } from "@/lib/api/reports"
+import { getDocuments } from "@/lib/api/documents"
 
-// Admin data
-const dailyActivity = [
-  { date: "01 Jan", actions: 124 },
-  { date: "02 Jan", actions: 189 },
-  { date: "03 Jan", actions: 156 },
-  { date: "04 Jan", actions: 203 },
-  { date: "05 Jan", actions: 178 },
-  { date: "06 Jan", actions: 267 },
-  { date: "07 Jan", actions: 245 },
-  { date: "08 Jan", actions: 198 },
-  { date: "09 Jan", actions: 312 },
-  { date: "10 Jan", actions: 289 },
-  { date: "11 Jan", actions: 256 },
-  { date: "12 Jan", actions: 345 },
-  { date: "13 Jan", actions: 298 },
-  { date: "14 Jan", actions: 367 },
-]
 
-const rolesData = [
-  { role: "Employee", count: 45, fill: "hsl(262, 83%, 58%)" },
-  { role: "Manager", count: 12, fill: "hsl(190, 95%, 45%)" },
-  { role: "Admin", count: 3, fill: "hsl(280, 65%, 60%)" },
-]
+type DailyActivityItem = {
+  date: string
+  actions: number
+}
 
-const recentActions = [
-  { user: "Ivanov I.", action: "DOWNLOAD", target: "Q4_Report.pdf", time: "2 min", avatar: "II" },
-  { user: "Petrova A.", action: "SHARE", target: "Budget_2026.xlsx", time: "5 min", avatar: "PA" },
-  { user: "Sidorov K.", action: "CREATE", target: "Proposal_v3.docx", time: "12 min", avatar: "SK" },
-  { user: "Kozlova M.", action: "UPDATE", target: "NDA_Template.pdf", time: "18 min", avatar: "KM" },
-  { user: "Novikov D.", action: "DELETE", target: "Old_Invoice.pdf", time: "25 min", avatar: "ND" },
-]
+type RoleItem = {
+  role: string
+  count: number
+  fill: string
+}
 
-const topUsers = [
-  { email: "ivanov@co", actions: 156 },
-  { email: "petrova@co", actions: 134 },
-  { email: "sidorov@co", actions: 98 },
-  { email: "kozlova@co", actions: 87 },
-  { email: "novikov@co", actions: 72 },
-]
+type TopUser = {
+  email: string
+  actions: number
+}
+
+type RecentAction = {
+  user: string
+  action: string
+  target: string
+  time: string
+}
+
+type Stats = {
+  documents: number
+  users: number
+  downloads: number
+  shares: number
+  audit_events: number
+}
 
 // User data
 const userActivity = [
@@ -99,24 +107,10 @@ const userActivity = [
   { date: "Sun", views: 3, downloads: 0 },
 ]
 
-const myDocuments = [
-  { name: "Q4_Financial_Report.pdf", type: "PDF", size: "2.4 MB", updated: "2 hours ago", status: "active" },
-  { name: "Project_Proposal_v2.docx", type: "DOCX", size: "1.1 MB", updated: "Yesterday", status: "active" },
-  { name: "Meeting_Notes_Jan.pdf", type: "PDF", size: "0.8 MB", updated: "3 days ago", status: "active" },
-  { name: "Budget_Template.xlsx", type: "XLSX", size: "0.5 MB", updated: "1 week ago", status: "archived" },
-]
-
-const sharedWithMe = [
-  { name: "Company_Policy_2026.pdf", owner: "HR Department", ownerInitials: "HR", permission: "view", expires: "30 days", color: "from-violet-500 to-purple-600" },
-  { name: "Q1_Targets.xlsx", owner: "Sidorov K.", ownerInitials: "SK", permission: "edit", expires: "14 days", color: "from-cyan-500 to-teal-600" },
-  { name: "NDA_Template.pdf", owner: "Legal Team", ownerInitials: "LT", permission: "view", expires: "Never", color: "from-emerald-500 to-green-600" },
-]
-
-const recentUserActivity = [
-  { action: "Viewed", target: "Q4_Financial_Report.pdf", time: "10 min ago", icon: Eye },
-  { action: "Downloaded", target: "Project_Proposal_v2.docx", time: "2 hours ago", icon: Download },
-  { action: "Uploaded", target: "Meeting_Notes_Jan.pdf", time: "Yesterday", icon: FileUp },
-  { action: "Shared", target: "Budget_Template.xlsx", time: "3 days ago", icon: Share2 },
+const expiringAccess = [
+  { name: "Q1_Targets.xlsx", owner: "Sidorov K.", ownerInitials: "SK", permission: "edit", expiresIn: 3, color: "from-rose-500 to-pink-600" },
+  { name: "Budget_Draft.pdf", owner: "Finance Dept", ownerInitials: "FD", permission: "view", expiresIn: 7, color: "from-amber-500 to-orange-600" },
+  { name: "Project_Timeline.docx", owner: "Petrova A.", ownerInitials: "PA", permission: "edit", expiresIn: 14, color: "from-cyan-500 to-teal-600" },
 ]
 
 const AVATAR_COLORS = [
@@ -125,7 +119,17 @@ const AVATAR_COLORS = [
   "from-rose-500 to-pink-600",
   "from-amber-500 to-orange-600",
   "from-emerald-500 to-green-600",
+  "from-blue-500 to-indigo-600",
+  "from-fuchsia-500 to-pink-600",
+  "from-lime-500 to-emerald-600",
+  "from-sky-500 to-blue-600",
 ]
+
+const ROLE_COLORS: Record<string, string> = {
+  admin: "hsl(280, 65%, 60%)",
+  manager: "hsl(190, 95%, 45%)",
+  employee: "hsl(262, 83%, 58%)",
+}
 
 function getActionBadgeClasses(action: string) {
   switch (action) {
@@ -134,8 +138,54 @@ function getActionBadgeClasses(action: string) {
     case "DELETE": return "bg-rose-500/15 text-rose-400 border-rose-500/30"
     case "DOWNLOAD": return "bg-amber-500/15 text-amber-400 border-amber-500/30"
     case "SHARE": return "bg-violet-500/15 text-violet-400 border-violet-500/30"
+    case "LOGIN": return "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
+    case "LOGOUT": return "bg-red-500/15 text-red-400 border-red-500/30"
+    case "APPROVE": return "bg-blue-500/15 text-blue-400 border-blue-500/30"
     default: return "bg-secondary text-muted-foreground border-border"
   }
+}
+
+const ACTION_CONFIG: Record<string, { icon: any; className: string }> = {
+  CREATE: {
+    icon: FileText,
+    className: "bg-emerald-500/15 text-emerald-400",
+  },
+  UPDATE: {
+    icon: FileUp,
+    className: "bg-sky-500/15 text-sky-400",
+  },
+  DELETE: {
+    icon: AlertCircle,
+    className: "bg-rose-500/15 text-rose-400",
+  },
+  DOWNLOAD: {
+    icon: Download,
+    className: "bg-amber-500/15 text-amber-400",
+  },
+  SHARE: {
+    icon: Share2,
+    className: "bg-cyan-500/15 text-cyan-400",
+  },
+  LOGIN: {
+    icon: Key,
+    className: "bg-cyan-500/15 text-cyan-400",
+  },
+  LOGOUT: {
+    icon: Lock,
+    className: "bg-red-500/15 text-red-400",
+  },
+  APPROVE: {
+    icon: CheckCircle2,
+    className: "bg-blue-500/15 text-blue-400",
+  },
+  DEFAULT: {
+    icon: Activity,
+    className: "bg-secondary text-muted-foreground",
+  },
+}
+
+function getActionConfig(action: string) {
+  return ACTION_CONFIG[action] || ACTION_CONFIG.DEFAULT
 }
 
 function CustomTooltipArea({ active, payload, label }: any) {
@@ -173,15 +223,169 @@ function CustomTooltipUser({ active, payload, label }: any) {
 
 function getFileIcon(type: string) {
   switch (type) {
-    case "PDF": return "bg-rose-500/20 text-rose-400"
-    case "DOCX": return "bg-blue-500/20 text-blue-400"
-    case "XLSX": return "bg-emerald-500/20 text-emerald-400"
-    default: return "bg-secondary text-muted-foreground"
+    case "pdf":
+      return (
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500/20 to-red-600/20 border border-rose-500/10">
+          <File className="h-4 w-4 text-rose-400" />
+        </div>
+      )
+    case "doc":
+    case "docx":
+      return (
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 border border-blue-500/10">
+          <FileText className="h-4 w-4 text-blue-400" />
+        </div>
+      )
+    case "xlsx":
+      return (
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 border border-emerald-500/10">
+          <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+        </div>
+      )
+    case "png":
+    case "jpg":
+      return (
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 to-blue-600/20 border border-sky-500/10">
+          <FileImage className="h-4 w-4 text-sky-400" />
+        </div>
+      )
+    default:
+      return (
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-600/20 border border-violet-500/10">
+          <FileText className="h-4 w-4 text-violet-400" />
+        </div>
+      )
   }
 }
 
-// Admin Dashboard Component
+function formatUserName(name?: string, email?: string) {
+  if (!name) {
+    if (!email) return "Unknown"
+    name = email.split("@")[0]
+  }
+
+  const parts = name.trim().split(" ").filter(Boolean)
+
+  return parts.slice(0, 2).join(" ")
+}
+
+function getUserInitials(name?: string) {
+  if (!name) return "?"
+
+  const parts = name.trim().split(" ").filter(Boolean)
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+
+  return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Администратор",
+  manager: "Менеджер",
+  employee: "Сотрудник",
+}
+
+function getFirstName(value?: string) {
+  if (!value) return "User"
+
+  const parts = value
+    .replace(/\./g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+
+  const name = parts[1] || parts[0] || "User"
+
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
+
+
 function AdminDashboard() {
+  const [loading, setLoading] = useState(true)
+
+  const [dailyActivity, setDailyActivity] = useState<DailyActivityItem[]>([])
+  const [rolesData, setRolesData] = useState<RoleItem[]>([])
+  const [topUsers, setTopUsers] = useState<TopUser[]>([])
+  const [recentActions, setRecentActions] = useState<RecentAction[]>([])
+  const [stats, setStats] = useState<Stats | null>(null)
+  const { name, email } = useUser()
+
+  const displayName = getFirstName(name)
+
+  const router = useRouter()
+
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+
+      const [
+        daily,
+        roles,
+        top,
+        documents,
+        sharing,
+        downloads,
+        audit,
+        dashboard
+      ] = await Promise.all([
+        getDailyActivity(14),
+        getUserRolesDistribution(),
+        getTopUsers(),
+        getDocumentActivity(),
+        getSharingActivity(),
+        getDownloadActivity(),
+        getAuditLogs({ limit: 7, offset: 0 }),
+        getDashboardStats()
+      ])
+
+      setDailyActivity(
+        daily.data.map((d: any) => ({
+          date: new Date(d.date).toLocaleDateString(),
+          actions: d.actions_count
+        }))
+      )
+      setRolesData(
+        roles.data.map((r: any) => ({
+          role: ROLE_LABELS[r.role] || r.role,
+          count: r.users_count,
+          fill: ROLE_COLORS[r.role] || "gray"
+        }))
+      )
+      setTopUsers(
+        top.data.map((u: any) => ({
+          email: u.user_email,
+          actions: u.actions_count
+        }))
+      )
+
+      setRecentActions(
+        audit.data.results.map((log: any) => ({
+          user: formatUserName(log.user_name, log.user_email) || "Unknown",
+          action: log.action,
+          target: log.target_name || "-",
+          time: new Date(log.timestamp).toLocaleTimeString(),
+        }))
+      )
+
+      // setStats({
+      //   documents: documents.data?.length ?? 0,
+      //   users: roles.data?.reduce((a: number, b: any) => a + b.count, 0),
+      //   downloads: downloads.data?.reduce((a: number, b: any) => a + b.downloads_count, 0)
+      // })
+
+      setStats(dashboard.data)
+
+      setLoading(false)
+    }
+
+    load()
+  }, [])
+
+
   return (
     <>
       {/* Welcome banner */}
@@ -191,34 +395,24 @@ function AdminDashboard() {
         <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-cyan-500/10 blur-3xl" />
         <div className="relative flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Welcome back, Admin</h2>
+            <h2 className="text-lg font-medium text-foreground tracking-wide ">С возвращением, {displayName}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {"You have "}
-              <span className="text-violet-400 font-semibold">23 new documents</span>
-              {" and "}
-              <span className="text-cyan-400 font-semibold">5 pending reviews</span>
-              {" today."}
+              {" Панель управления содержит  "}
+              <span className="text-violet-400 font-mono font-medium tracking-wide">актуальную информацию</span>
+              {" о "}
+              <span className="text-cyan-400 font-mono font-medium tracking-wide ">последних событиях.</span>
             </p>
-          </div>
-          <div className="hidden sm:flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
-              <TrendingUp className="h-4 w-4 text-emerald-400" />
-              <div className="flex flex-col">
-                <span className="text-[10px] text-emerald-400/70">Activity</span>
-                <span className="text-xs font-bold text-emerald-400">+18%</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Stats */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <StatCard title="Documents" value="1,284" change="+23 this week" changeType="positive" icon={FileText} accentColor="0" />
-        <StatCard title="Users" value="60" change="+3 this month" changeType="positive" icon={Users} accentColor="1" />
-        <StatCard title="Downloads" value="3,456" change="+12% vs last week" changeType="positive" icon={Download} accentColor="2" />
-        <StatCard title="Shared" value="892" change="156 this week" changeType="neutral" icon={Share2} accentColor="3" />
-        <StatCard title="Audit Events" value="12,847" change="Last 30 days" changeType="neutral" icon={Shield} accentColor="4" />
+        <StatCard title="Documents" value={String(stats?.documents ?? 0)} icon={FileText} accentColor="0" />
+        <StatCard title="Users" value={String(stats?.users ?? 0)} icon={Users} accentColor="1" />
+        <StatCard title="Downloads" value={String(stats?.downloads ?? 0)} icon={Download} accentColor="2" />
+        <StatCard title="Shared" value={String(stats?.shares ?? 0)} icon={Share2} accentColor="3" />
+        <StatCard title="Audit Events" value={String(stats?.audit_events ?? 0)} icon={Shield} accentColor="4" />
         {/* <StatCard title="Active Now" value="24" change="Online users" changeType="neutral" icon={Activity} accentColor="5" /> */}
       </div>
 
@@ -230,8 +424,8 @@ function AdminDashboard() {
           <div className="relative">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Daily Activity</h3>
-                <p className="text-xs text-muted-foreground">Actions per day for the last 14 days</p>
+                <h3 className="text-sm font-mono font-medium text-foreground">Ежедневная активность</h3>
+                <p className="text-xs text-muted-foreground">Количество действий в день за последние 14 дней</p>
               </div>
               <Badge variant="outline" className="text-[10px] font-mono bg-violet-500/10 text-violet-400 border-violet-500/20">
                 Last 14 days
@@ -265,8 +459,8 @@ function AdminDashboard() {
           <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
           <div className="relative">
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-foreground">Roles Distribution</h3>
-              <p className="text-xs text-muted-foreground">Users by role</p>
+              <h3 className="text-sm font-mono font-medium text-foreground">Распределение ролей</h3>
+              <p className="text-xs text-muted-foreground">Пользователи по роли</p>
             </div>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
@@ -313,11 +507,15 @@ function AdminDashboard() {
           <div className="relative">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Recent Actions</h3>
-                <p className="text-xs text-muted-foreground">Latest audit events</p>
+                <h3 className="text-sm font-mono font-medium text-foreground">Недавние действия</h3>
+                <p className="text-xs text-muted-foreground">Последние события аудита</p>
               </div>
-              <button className="flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors">
-                View all <ArrowUpRight className="h-3 w-3" />
+              <button
+                onClick={() => router.push("/dashboard/audit")}
+                className="flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors"
+              >
+
+                Просмотреть все <ArrowUpRight className="h-3 w-3" />
               </button>
             </div>
             <div className="flex flex-col gap-2.5">
@@ -329,14 +527,17 @@ function AdminDashboard() {
                   <div className="flex items-center gap-3">
                     <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br ${AVATAR_COLORS[i]} shadow-sm`}>
                       <span className="text-[10px] font-bold text-white">
-                        {action.avatar}
+                        {getUserInitials(action.user)}
                       </span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-xs font-medium text-foreground">
+                      <span className="text-xs font-medium text-foreground tracking-wide">
                         {action.user}
                       </span>
-                      <span className="text-[10px] text-muted-foreground font-mono">
+                      <span
+                        className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px] cursor-default"
+                        title={action.target}
+                      >
                         {action.target}
                       </span>
                     </div>
@@ -364,14 +565,11 @@ function AdminDashboard() {
           <div className="relative">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Top Active Users</h3>
-                <p className="text-xs text-muted-foreground">Most actions this month</p>
+                <h3 className="text-sm font-mono font-medium text-foreground">Топ активных пользователей</h3>
+                <p className="text-xs text-muted-foreground">Больше всего действий в этом месяце</p>
               </div>
-              <button className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors">
-                Details <ArrowUpRight className="h-3 w-3" />
-              </button>
             </div>
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={300}>
               <BarChart data={topUsers} layout="vertical" barSize={20}>
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
@@ -382,7 +580,7 @@ function AdminDashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 12%)" horizontal={false} />
                 <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
-                <YAxis type="category" dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 10 }} width={90} />
+                <YAxis type="category" dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 10 }} width={140} interval={0} />
                 <Tooltip content={<CustomTooltipArea />} />
                 <Bar dataKey="actions" fill="url(#barGradient)" radius={[0, 6, 6, 0]} />
               </BarChart>
@@ -396,16 +594,84 @@ function AdminDashboard() {
 
 // User Dashboard Component
 function UserDashboard() {
+  const [documents, setDocuments] = useState<any[]>([])
+  const [docsLoading, setDocsLoading] = useState(true)
+  const [recentActions, setRecentActions] = useState<any[]>([])
+  const router = useRouter()
+
+  const { name, email, loading } = useUser()
+  const displayName = getFirstName(name)
+
+
+
+  useEffect(() => {
+    const loadDocs = async () => {
+      try {
+        setDocsLoading(true)
+
+        const res = await getDocuments({
+          limit: 4,
+          ordering: "-updated_at",
+        })
+
+        setDocuments(res.data.results ?? res.data)
+      } finally {
+        setDocsLoading(false)
+      }
+    }
+
+    loadDocs()
+  }, [])
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [docsRes, auditRes] = await Promise.all([
+          getDocuments({
+            limit: 4,
+            ordering: "-updated_at",
+          }),
+          getAuditLogs({
+            limit: 5,
+            ordering: "-timestamp",
+            user_email: email,
+          }),
+        ])
+
+        setDocuments(docsRes.data.results ?? docsRes.data)
+
+        setRecentActions(
+          auditRes.data.results
+            .map((log: any) => ({
+              action: log.action,
+              target: log.target_name || "-",
+              time: new Date(log.timestamp).toLocaleString(),
+            }))
+        )
+      } finally {
+        setDocsLoading(false)
+      }
+    }
+
+    if (email) {
+      load()
+    }
+  }, [email])
+
+  if (loading) {
+    return <div>Loading...</div>
+  }
+
   return (
     <>
       {/* Welcome banner */}
-      <div className="relative mb-6 overflow-hidden rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-600/10 via-purple-600/5 to-cyan-500/10 p-6">
+      <div className=" max-w-7xl mx-auto relative mb-6 overflow-hidden rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-600/10 via-purple-600/5 to-cyan-500/10 p-6">
         <div className="absolute top-0 right-0 h-full w-1/3 bg-gradient-to-l from-cyan-500/10 to-transparent" />
         <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-violet-500/10 blur-3xl" />
         <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-cyan-500/10 blur-3xl" />
         <div className="relative flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Welcome, Ivanov Ivan</h2>
+            <h2 className="text-lg font-medium tracking-wide text-foreground">С возвращением, {displayName}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {"You have "}
               <span className="text-violet-400 font-semibold">4 documents</span>
@@ -427,7 +693,7 @@ function UserDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="My Documents" value="4" change="2 this week" changeType="positive" icon={FolderOpen} accentColor="0" />
         <StatCard title="Shared with Me" value="3" change="1 new" changeType="positive" icon={Share2} accentColor="1" />
         <StatCard title="Downloads" value="28" change="This month" changeType="neutral" icon={Download} accentColor="2" />
@@ -435,7 +701,7 @@ function UserDashboard() {
       </div>
 
       {/* Main content */}
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="max-w-7xl mx-auto mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Activity Chart */}
         <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
           <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-violet-500/5 blur-3xl" />
@@ -491,29 +757,39 @@ function UserDashboard() {
               <p className="text-xs text-muted-foreground">Your latest actions</p>
             </div>
             <div className="flex flex-col gap-3">
-              {recentUserActivity.map((item, i) => (
-                <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-secondary/30 transition-colors">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${item.action === "Viewed" ? "bg-violet-500/15 text-violet-400" :
-                      item.action === "Downloaded" ? "bg-amber-500/15 text-amber-400" :
-                        item.action === "Uploaded" ? "bg-emerald-500/15 text-emerald-400" :
-                          "bg-cyan-500/15 text-cyan-400"
-                    }`}>
-                    <item.icon className="h-4 w-4" />
+              {recentActions.map((item, i) => {
+                const config = getActionConfig(item.action)
+                const Icon = config.icon
+
+                return (
+                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-secondary/30 transition-colors">
+
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${config.className}`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="text-xs font-medium text-foreground truncate">
+                        {item.target}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {item.action}
+                      </span>
+                    </div>
+
+                    <span className="text-[10px] text-muted-foreground/60 shrink-0">
+                      {item.time}
+                    </span>
                   </div>
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-xs font-medium text-foreground truncate">{item.target}</span>
-                    <span className="text-[10px] text-muted-foreground">{item.action}</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground/60 shrink-0">{item.time}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
       </div>
 
       {/* Documents and Shared */}
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="max-w-7xl mx-auto mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* My Documents */}
         <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
           <div className="absolute -top-16 -left-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />
@@ -521,59 +797,69 @@ function UserDashboard() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">My Documents</h3>
-                <p className="text-xs text-muted-foreground">Recently updated files</p>
+                <p className="text-xs text-muted-foreground">Documents you have access to</p>
               </div>
-              <button className="flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors">
-                View all <ArrowUpRight className="h-3 w-3" />
+              <button
+                onClick={() => router.push("/dashboard/documents")}
+                className="flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                Просмотреть все<ArrowUpRight className="h-3 w-3" />
               </button>
             </div>
             <div className="flex flex-col gap-2.5">
-              {myDocuments.map((doc, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded-xl bg-secondary/30 px-3.5 py-3 border border-transparent hover:border-border/50 transition-all duration-200 hover:bg-secondary/50 cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${getFileIcon(doc.type)}`}>
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-medium text-foreground">{doc.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground">{doc.size}</span>
-                        <span className="text-[10px] text-muted-foreground/40">•</span>
-                        <span className="text-[10px] text-muted-foreground">{doc.updated}</span>
+              {docsLoading ? (
+                <div className="text-xs text-muted-foreground">Loading...</div>
+              ) : (
+                documents.map((doc, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-xl bg-secondary/30 px-3.5 py-3 border border-transparent hover:border-border/50 transition-all duration-200 hover:bg-secondary/50 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg">
+                        {getFileIcon(doc.type)}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-medium text-foreground">{doc.title}.{doc.type}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">{doc.size}</span>
+                          <span className="text-[10px] text-muted-foreground/40">•</span>
+                          <span className="text-[10px] text-muted-foreground">{new Date(doc.updated_at).toLocaleString()}</span>
+                        </div>
                       </div>
                     </div>
+                    {/* <Badge variant="outline" className={`text-[9px] font-mono ${doc.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-secondary text-muted-foreground border-border"
+                      }`}>
+                      {doc.type}
+                    </Badge> */}
                   </div>
-                  <Badge variant="outline" className={`text-[9px] font-mono ${doc.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-secondary text-muted-foreground border-border"
-                    }`}>
-                    {doc.type}
-                  </Badge>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
 
-        {/* Shared with Me */}
+        {/* Expiring Access */}
         <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
-          <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
+          <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-amber-500/5 blur-3xl" />
           <div className="relative">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Shared with Me</h3>
-                <p className="text-xs text-muted-foreground">Documents you have access to</p>
+                <h3 className="text-sm font-semibold text-foreground">Expiring Access</h3>
+                <p className="text-xs text-muted-foreground">Documents with expiring permissions</p>
               </div>
-              <button className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors">
-                View all <ArrowUpRight className="h-3 w-3" />
-              </button>
+              <Badge variant="outline" className="text-[10px] font-mono bg-amber-500/10 text-amber-400 border-amber-500/20">
+                {expiringAccess.length} items
+              </Badge>
             </div>
             <div className="flex flex-col gap-2.5">
-              {sharedWithMe.map((doc, i) => (
+              {expiringAccess.map((doc, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between rounded-xl bg-secondary/30 px-3.5 py-3 border border-transparent hover:border-border/50 transition-all duration-200 hover:bg-secondary/50 cursor-pointer"
+                  className={`flex items-center justify-between rounded-xl px-3.5 py-3 border transition-all duration-200 hover:bg-secondary/50 cursor-pointer ${doc.expiresIn <= 3 ? "bg-rose-500/5 border-rose-500/20" :
+                    doc.expiresIn <= 7 ? "bg-amber-500/5 border-amber-500/20" :
+                      "bg-secondary/30 border-transparent hover:border-border/50"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <Avatar className="h-9 w-9">
@@ -586,17 +872,23 @@ function UserDashboard() {
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground">{doc.owner}</span>
                         <span className="text-[10px] text-muted-foreground/40">•</span>
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-2.5 w-2.5" />
-                          {doc.expires}
-                        </span>
+                        <Badge variant="outline" className={`text-[9px] font-mono px-1.5 py-0 ${doc.permission === "edit" ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" : "bg-violet-500/10 text-violet-400 border-violet-500/20"
+                          }`}>
+                          {doc.permission === "edit" ? "Edit" : "View"}
+                        </Badge>
                       </div>
                     </div>
                   </div>
-                  <Badge variant="outline" className={`text-[9px] font-mono ${doc.permission === "edit" ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" : "bg-violet-500/10 text-violet-400 border-violet-500/20"
-                    }`}>
-                    {doc.permission === "edit" ? "Edit" : "View"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {doc.expiresIn <= 3 && <AlertCircle className="h-3.5 w-3.5 text-rose-400" />}
+                    <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${doc.expiresIn <= 3 ? "bg-rose-500/15 text-rose-400" :
+                      doc.expiresIn <= 7 ? "bg-amber-500/15 text-amber-400" :
+                        "bg-secondary text-muted-foreground"
+                      }`}>
+                      <Calendar className="h-3 w-3" />
+                      <span className="text-[10px] font-mono font-medium">{doc.expiresIn}d</span>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -605,7 +897,7 @@ function UserDashboard() {
       </div>
 
       {/* Quick Actions & Security */}
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="max-w-7xl mx-auto mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Quick Actions */}
         <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
           <div className="absolute -top-16 -right-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />

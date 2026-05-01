@@ -1,5 +1,5 @@
 from rest_framework import viewsets, filters
-from rest_framework.permissions import IsAdminUser  
+from rest_framework.permissions import IsAuthenticated  
 from rest_framework.filters import SearchFilter
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,17 +11,32 @@ from .serializers import AuditLogSerializer
 from .permissions import IsAuditAdmin
 from .utils.pagination import AuditLimitOffsetPagination
 from .filters import AuditLogFilter
+from config.constants import AuditAction
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("user").all()
     serializer_class = AuditLogSerializer
-    permission_classes = [IsAuditAdmin]
+    permission_classes = [IsAuthenticated]
     pagination_class = AuditLimitOffsetPagination
 
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = AuditLogFilter
     search_fields = ["user__email", "user__full_name", "target_type"]
     ordering_fields = ["timestamp"]
+
+
+    def get_queryset(self):  # type: ignore
+        user = self.request.user
+
+        qs = AuditLog.objects.select_related("user")
+
+        if getattr(user, "role", None) == "admin":
+            return qs.all()
+
+        return qs.filter(user=user).exclude(
+            action__in=[AuditAction.LOGIN, AuditAction.LOGOUT]
+    )
+    
 
     @action(detail=False, methods=['get'])
     def action_counts(self, request):

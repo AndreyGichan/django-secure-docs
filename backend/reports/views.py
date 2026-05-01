@@ -13,7 +13,8 @@ from .serializers import (
     SuspiciousActivityReportSerializer,
     GraphNodeSerializer, 
     GraphEdgeSerializer, 
-    CentralitySerializer
+    CentralitySerializer,
+    DashboardStatsSerializer
 )
 from .permissions import IsReportAdmin
 from .services import ReportsService
@@ -48,10 +49,16 @@ class ReportsViewSet(viewsets.ViewSet):
     def roles_distribution(self, request):
         data = ReportsService.roles_report()
         return Response(RolesReportSerializer(data, many=True).data)
+    
+    @action(detail=False, methods=['get'])
+    def user_roles_distribution(self, request):
+        data = ReportsService.user_roles_report()
+        return Response(data)
 
     @action(detail=False, methods=['get'])
     def daily_activity(self, request):
-        data = ReportsService.daily_activity()
+        days = int(request.query_params.get("days", 30))
+        data = ReportsService.daily_activity(days=days)
         return Response(DailyActivityReportSerializer(data, many=True).data)
 
     @action(detail=False, methods=['get'])
@@ -68,3 +75,8 @@ class ReportsViewSet(viewsets.ViewSet):
     def collaboration_index(self, request):
         data = ReportsService.collaboration_index()
         return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='dashboard-stats')
+    def dashboard_stats(self, request):
+        data = ReportsService.dashboard_stats()
+        return Response(DashboardStatsSerializer(data).data)

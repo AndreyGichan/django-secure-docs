@@ -15,11 +15,19 @@ export const getSharingActivity = () =>
 export const getRolesDistribution = () =>
     API.get("reports/roles_distribution/")
 
-export const getDailyActivity = () =>
-    API.get("reports/daily_activity/")
+export const getUserRolesDistribution = () =>
+    API.get("reports/user_roles_distribution/")
+
+export const getDailyActivity = (days?: number) =>
+    API.get("reports/daily_activity/", {
+        params: { days }
+    })
 
 export const getSuspiciousActivity = () =>
     API.get("reports/suspicious_activity/")
 
 export const getCollaborationIndex = () =>
     API.get("reports/collaboration_index/")
+
+export const getDashboardStats = () =>
+    API.get("reports/dashboard-stats/")

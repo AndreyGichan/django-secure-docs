@@ -4,6 +4,7 @@ from django.db.models import Count, Max, Q
 from django.db.models.functions import TruncDate
 from datetime import timedelta
 from django.utils import timezone
+from users.models import User
 
 
 class ReportsService:
@@ -97,6 +98,21 @@ class ReportsService:
         return [
             {"role": row["role"], "users_count": row["users_count"]} for row in queryset
         ]
+    
+
+    @staticmethod
+    def user_roles_report():
+        queryset = User.objects.values("role").annotate(
+            users_count=Count("id")
+        )
+
+        return [
+            {
+                "role": row["role"],
+                "users_count": row["users_count"]
+            }
+            for row in queryset
+        ]
 
     @staticmethod
     def daily_activity(days=30):
@@ -172,3 +188,15 @@ class ReportsService:
             }
             for r in queryset
         ]
+
+
+
+    @staticmethod
+    def dashboard_stats():
+        return {
+            "documents": Document.objects.count(),
+            "users": User.objects.count(),
+            "downloads": AuditLog.objects.filter(action="DOWNLOAD").count(),
+            "shares": AuditLog.objects.filter(action="SHARE").count(),
+            "audit_events": AuditLog.objects.count(),
+        }

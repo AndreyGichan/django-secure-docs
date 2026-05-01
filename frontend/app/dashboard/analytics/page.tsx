@@ -440,7 +440,7 @@ export default function AnalyticsPage() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 14%)" horizontal={false} />
                     <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 10 }} />
-                    <YAxis type="category" dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 9 }} width={140} />
+                    <YAxis type="category" dataKey="email" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 55%)", fontSize: 9 }} width={140}/>
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="actions_count" fill="url(#topBarGrad)" radius={[0, 4, 4, 0]} />
                   </BarChart>
