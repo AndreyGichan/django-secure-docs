@@ -57,6 +57,9 @@ export const getMyEncryptedDEK = (documentId: string) => {
     return API.get(`documents/${documentId}/my_dek/`);
 };
 
+export const getExpiringAccess = () =>
+    API.get("documents/expiring-access/");
+
 export const createDownloadLink = async (documentId: string, versionId?: number) => {
     const { data } = await API.post(`documents/${documentId}/create_download_link/`,
         { version_id: versionId });

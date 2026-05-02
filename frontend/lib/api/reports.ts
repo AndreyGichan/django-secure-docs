@@ -31,3 +31,6 @@ export const getCollaborationIndex = () =>
 
 export const getDashboardStats = () =>
     API.get("reports/dashboard-stats/")
+
+export const getUserDashboardStats = () =>
+    API.get("reports/user-dashboard-stats/")

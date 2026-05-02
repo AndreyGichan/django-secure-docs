@@ -60,9 +60,9 @@ import {
   getUserRolesDistribution,
   getDailyActivity,
 } from "@/lib/api/reports"
-import { getAuditLogs } from "@/lib/api/audit"
-import { getDashboardStats } from "@/lib/api/reports"
-import { getDocuments } from "@/lib/api/documents"
+import { getAuditLogs, getUserWeekActivity } from "@/lib/api/audit"
+import { getDashboardStats, getUserDashboardStats } from "@/lib/api/reports"
+import { getDocuments, getExpiringAccess } from "@/lib/api/documents"
 
 
 type DailyActivityItem = {
@@ -96,22 +96,6 @@ type Stats = {
   audit_events: number
 }
 
-// User data
-const userActivity = [
-  { date: "Mon", views: 12, downloads: 3 },
-  { date: "Tue", views: 18, downloads: 5 },
-  { date: "Wed", views: 8, downloads: 2 },
-  { date: "Thu", views: 24, downloads: 8 },
-  { date: "Fri", views: 15, downloads: 4 },
-  { date: "Sat", views: 6, downloads: 1 },
-  { date: "Sun", views: 3, downloads: 0 },
-]
-
-const expiringAccess = [
-  { name: "Q1_Targets.xlsx", owner: "Sidorov K.", ownerInitials: "SK", permission: "edit", expiresIn: 3, color: "from-rose-500 to-pink-600" },
-  { name: "Budget_Draft.pdf", owner: "Finance Dept", ownerInitials: "FD", permission: "view", expiresIn: 7, color: "from-amber-500 to-orange-600" },
-  { name: "Project_Timeline.docx", owner: "Petrova A.", ownerInitials: "PA", permission: "edit", expiresIn: 14, color: "from-cyan-500 to-teal-600" },
-]
 
 const AVATAR_COLORS = [
   "from-violet-500 to-purple-600",
@@ -302,6 +286,52 @@ function getFirstName(value?: string) {
 }
 
 
+function formatExpires(expiresIn: number, unit: string) {
+  if (!unit) return `${expiresIn} д`
+
+  const u = unit.toLowerCase()
+
+  if (u.startsWith("hour")) return `${expiresIn} ч`
+  if (u.startsWith("day")) return `${expiresIn} д`
+
+  return `${expiresIn}`
+}
+
+function getExpiresInHours(value: number, unit: string) {
+  if (!unit) return value
+
+  const u = unit.toLowerCase()
+
+  if (u.startsWith("hour")) return value
+  if (u.startsWith("day")) return value * 24
+
+  return value
+}
+
+
+function fillLast7Days(data: any[]) {
+  const days: any[] = []
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+
+    const key = d.toLocaleDateString("en-US", { weekday: "short" })
+
+    const found = data.find(
+      (x) => x.date === key
+    )
+
+    days.push({
+      date: key,
+      actions: found?.actions || 0,
+      downloads: found?.downloads || 0,
+    })
+  }
+
+  return days
+}
+
 
 function AdminDashboard() {
   const [loading, setLoading] = useState(true)
@@ -400,7 +430,8 @@ function AdminDashboard() {
               {" Панель управления содержит  "}
               <span className="text-violet-400 font-mono font-medium tracking-wide">актуальную информацию</span>
               {" о "}
-              <span className="text-cyan-400 font-mono font-medium tracking-wide ">последних событиях.</span>
+              <span className="text-cyan-400 font-mono font-medium tracking-wide ">последних событиях</span>
+              {"."}
             </p>
           </div>
         </div>
@@ -592,43 +623,46 @@ function AdminDashboard() {
   )
 }
 
-// User Dashboard Component
 function UserDashboard() {
   const [documents, setDocuments] = useState<any[]>([])
   const [docsLoading, setDocsLoading] = useState(true)
   const [recentActions, setRecentActions] = useState<any[]>([])
+  const [expiringAccess, setExpiringAccess] = useState<any[]>([])
+  const [userActivity, setUserActivity] = useState<any[]>([])
+  const [stats, setStats] = useState<any>(null)
   const router = useRouter()
-
   const { name, email, loading } = useUser()
   const displayName = getFirstName(name)
 
 
-
   useEffect(() => {
-    const loadDocs = async () => {
+    const loadActivity = async () => {
       try {
-        setDocsLoading(true)
+        const res = await getUserWeekActivity()
 
-        const res = await getDocuments({
-          limit: 4,
-          ordering: "-updated_at",
-        })
+        const formatted = res.data.map((item: any) => ({
+          date: new Date(item.date).toLocaleDateString("en-US", {
+            weekday: "short",
+          }),
+          actions: item.document_actions,
+          downloads: item.downloads,
+        }))
 
-        setDocuments(res.data.results ?? res.data)
-      } finally {
-        setDocsLoading(false)
+        setUserActivity(fillLast7Days(formatted))
+      } catch (e) {
+        console.error(e)
       }
     }
 
-    loadDocs()
+    loadActivity()
   }, [])
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [docsRes, auditRes] = await Promise.all([
+        const [docsRes, auditRes, statsRes] = await Promise.all([
           getDocuments({
-            limit: 4,
+            limit: 5,
             ordering: "-updated_at",
           }),
           getAuditLogs({
@@ -636,6 +670,7 @@ function UserDashboard() {
             ordering: "-timestamp",
             user_email: email,
           }),
+          getUserDashboardStats()
         ])
 
         setDocuments(docsRes.data.results ?? docsRes.data)
@@ -648,6 +683,8 @@ function UserDashboard() {
               time: new Date(log.timestamp).toLocaleString(),
             }))
         )
+
+        setStats(statsRes.data)
       } finally {
         setDocsLoading(false)
       }
@@ -658,9 +695,29 @@ function UserDashboard() {
     }
   }, [email])
 
-  if (loading) {
-    return <div>Loading...</div>
-  }
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await getExpiringAccess()
+
+        setExpiringAccess(
+          res.data.map((item: any) => ({
+            name: `${item.title}.${item.type}`,
+            owner: item.owner_name,
+            permission: item.role === "editor" ? "edit" : "view",
+            expiresIn: item.expires_in,
+            expiresUnit: item.expires_unit,
+          }))
+        )
+      } catch (e) {
+        console.error(e)
+      }
+    }
+
+    load()
+  }, [])
+
 
   return (
     <>
@@ -673,31 +730,22 @@ function UserDashboard() {
           <div>
             <h2 className="text-lg font-medium tracking-wide text-foreground">С возвращением, {displayName}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {"You have "}
-              <span className="text-violet-400 font-semibold">4 documents</span>
-              {" and "}
-              <span className="text-cyan-400 font-semibold">3 shared with you</span>
+              {"Здесь представлен обзор вашей "}
+              <span className="text-violet-400 font-mono font-medium tracking-wide">недавней активности</span>
+              {" и "}
+              <span className="text-cyan-400 font-mono font-medium tracking-wide">рабочего пространства</span>
               {"."}
             </p>
-          </div>
-          <div className="hidden sm:flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <div className="flex flex-col">
-                <span className="text-[10px] text-emerald-400/70">Key Status</span>
-                <span className="text-xs font-bold text-emerald-400">Active</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Stats */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="My Documents" value="4" change="2 this week" changeType="positive" icon={FolderOpen} accentColor="0" />
-        <StatCard title="Shared with Me" value="3" change="1 new" changeType="positive" icon={Share2} accentColor="1" />
-        <StatCard title="Downloads" value="28" change="This month" changeType="neutral" icon={Download} accentColor="2" />
-        <StatCard title="Storage Used" value="4.8 GB" change="48% of quota" changeType="neutral" icon={FileText} accentColor="3" />
+        <StatCard title="My Documents" value={String(stats?.my_documents ?? 0)} icon={FolderOpen} accentColor="0" />
+        <StatCard title="Shared with Me" value={String(stats?.shared_with_me ?? 0)} icon={Share2} accentColor="1" />
+        <StatCard title="Downloads" value={String(stats?.downloads ?? 0)} icon={Download} accentColor="2" />
+        <StatCard title="Storage Used" value={`${stats?.storage_used_mb ?? 0} MB`} icon={FileText} accentColor="3" />
       </div>
 
       {/* Main content */}
@@ -708,43 +756,57 @@ function UserDashboard() {
           <div className="relative">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">My Activity</h3>
-                <p className="text-xs text-muted-foreground">Views and downloads this week</p>
+                <h3 className="text-sm font-medium tracking-wide text-foreground">Моя активность</h3>
+                <p className="text-xs text-muted-foreground">Действия с документами и скачивания за неделю</p>
               </div>
               <Badge variant="outline" className="text-[10px] font-mono bg-violet-500/10 text-violet-400 border-violet-500/20">
-                This week
+                На этой неделе
               </Badge>
             </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={userActivity} barGap={4}>
-                <defs>
-                  <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.8} />
-                    <stop offset="100%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.3} />
-                  </linearGradient>
-                  <linearGradient id="downloadsGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(190, 95%, 45%)" stopOpacity={0.8} />
-                    <stop offset="100%" stopColor="hsl(190, 95%, 45%)" stopOpacity={0.3} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 12%)" vertical={false} />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
-                <Tooltip content={<CustomTooltipUser />} />
-                <Bar dataKey="views" name="Views" fill="url(#viewsGradient)" radius={[4, 4, 0, 0]} barSize={16} />
-                <Bar dataKey="downloads" name="Downloads" fill="url(#downloadsGradient)" radius={[4, 4, 0, 0]} barSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="flex items-center justify-center gap-6 mt-3">
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded bg-violet-500" />
-                <span className="text-[10px] text-muted-foreground">Views</span>
+            {userActivity.every(d => d.actions === 0 && d.downloads === 0) ? (
+              <div className="flex flex-col items-center justify-center h-[250px] text-center">
+                <TrendingUp className="h-6 w-6 text-muted-foreground mb-2" />
+                <span className="text-xs text-muted-foreground">
+                  Нет активности за неделю
+                </span>
+                <span className="text-[10px] text-muted-foreground/60">
+                  Данные появятся после ваших действий
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded bg-cyan-500" />
-                <span className="text-[10px] text-muted-foreground">Downloads</span>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={userActivity} barGap={4}>
+                  <defs>
+                    <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="hsl(262, 83%, 58%)" stopOpacity={0.3} />
+                    </linearGradient>
+                    <linearGradient id="downloadsGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(190, 95%, 45%)" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="hsl(190, 95%, 45%)" stopOpacity={0.3} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 12%)" vertical={false} />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
+                  <Tooltip content={<CustomTooltipUser />} />
+                  <Bar dataKey="actions" name="Все действия" fill="url(#viewsGradient)" radius={[4, 4, 0, 0]} barSize={16} />
+                  <Bar dataKey="downloads" name="Скачивания" fill="url(#downloadsGradient)" radius={[4, 4, 0, 0]} barSize={16} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+            {!userActivity.every(d => d.actions === 0 && d.downloads === 0) && (
+              <div className="flex items-center justify-center gap-6 mt-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded bg-violet-500" />
+                  <span className="text-[10px] text-muted-foreground">Все действия с документами</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded bg-cyan-500" />
+                  <span className="text-[10px] text-muted-foreground">Скачивания</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -753,36 +815,47 @@ function UserDashboard() {
           <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-3xl" />
           <div className="relative">
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-foreground">Recent Activity</h3>
-              <p className="text-xs text-muted-foreground">Your latest actions</p>
+              <h3 className="text-sm font-medium tracking-wide text-foreground">Недавняя активность</h3>
+              <p className="text-xs text-muted-foreground">Ваши последние действия</p>
             </div>
             <div className="flex flex-col gap-3">
-              {recentActions.map((item, i) => {
-                const config = getActionConfig(item.action)
-                const Icon = config.icon
+              {recentActions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Activity className="h-6 w-6 text-muted-foreground mb-2" />
+                  <span className="text-xs text-muted-foreground">
+                    Пока нет активности
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/60">
+                    Ваши действия появятся здесь
+                  </span>
+                </div>
+              ) : (
+                recentActions.map((item, i) => {
+                  const config = getActionConfig(item.action)
+                  const Icon = config.icon
 
-                return (
-                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-secondary/30 transition-colors">
+                  return (
+                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-secondary/30 transition-colors">
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${config.className}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
 
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${config.className}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <span className="text-xs font-medium text-foreground truncate">
+                          {item.target}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {item.action}
+                        </span>
+                      </div>
 
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <span className="text-xs font-medium text-foreground truncate">
-                        {item.target}
+                      <span className="text-[10px] text-muted-foreground/60 shrink-0">
+                        {item.time}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {item.action}
-                      </span>
                     </div>
-
-                    <span className="text-[10px] text-muted-foreground/60 shrink-0">
-                      {item.time}
-                    </span>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </div>
           </div>
         </div>
@@ -796,8 +869,8 @@ function UserDashboard() {
           <div className="relative">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">My Documents</h3>
-                <p className="text-xs text-muted-foreground">Documents you have access to</p>
+                <h3 className="text-sm font-medium tracking-wide text-foreground">Мои документы</h3>
+                <p className="text-xs text-muted-foreground">Документы, к которым у вас есть доступ</p>
               </div>
               <button
                 onClick={() => router.push("/dashboard/documents")}
@@ -808,7 +881,19 @@ function UserDashboard() {
             </div>
             <div className="flex flex-col gap-2.5">
               {docsLoading ? (
-                <div className="text-xs text-muted-foreground">Loading...</div>
+                <div className="flex items-center justify-center py-6">
+                  <div className="h-5 w-5 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <FolderOpen className="h-6 w-6 text-muted-foreground mb-2" />
+                  <span className="text-xs text-muted-foreground">
+                    Нет документов
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/60">
+                    Загрузите первый файл, чтобы начать работу
+                  </span>
+                </div>
               ) : (
                 documents.map((doc, i) => (
                   <div
@@ -845,61 +930,104 @@ function UserDashboard() {
           <div className="relative">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Expiring Access</h3>
-                <p className="text-xs text-muted-foreground">Documents with expiring permissions</p>
+                <h3 className="text-sm font-medium tracking-wide text-foreground">Истекающий доступ</h3>
+                <p className="text-xs text-muted-foreground">Документы с истекающими правами доступа</p>
               </div>
               <Badge variant="outline" className="text-[10px] font-mono bg-amber-500/10 text-amber-400 border-amber-500/20">
-                {expiringAccess.length} items
+                {expiringAccess.length} элементов
               </Badge>
             </div>
             <div className="flex flex-col gap-2.5">
-              {expiringAccess.map((doc, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center justify-between rounded-xl px-3.5 py-3 border transition-all duration-200 hover:bg-secondary/50 cursor-pointer ${doc.expiresIn <= 3 ? "bg-rose-500/5 border-rose-500/20" :
-                    doc.expiresIn <= 7 ? "bg-amber-500/5 border-amber-500/20" :
-                      "bg-secondary/30 border-transparent hover:border-border/50"
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback className={`bg-gradient-to-br ${doc.color} text-[10px] font-bold text-white`}>
-                        {doc.ownerInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-medium text-foreground">{doc.name}</span>
+              {expiringAccess.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-400 mb-2" />
+                  <span className="text-xs text-muted-foreground">
+                    Нет истекающих доступов
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/60">
+                    Все доступы актуальны
+                  </span>
+                </div>
+              ) : (
+                expiringAccess.map((doc, i) => {
+                  const hours = getExpiresInHours(doc.expiresIn, doc.expiresUnit)
+
+                  return (
+                    <div
+                      key={i}
+                      className={`flex items-center justify-between rounded-xl px-3.5 py-3 border transition-all duration-200 hover:bg-secondary/50 cursor-pointer ${hours <= 24
+                        ? "bg-rose-500/5 border-rose-500/20"
+                        : hours <= 24 * 7
+                          ? "bg-amber-500/5 border-amber-500/20"
+                          : "bg-secondary/30 border-transparent"
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback
+                            className={`bg-gradient-to-br ${AVATAR_COLORS[i % AVATAR_COLORS.length]} text-[10px] font-bold text-white`}
+                          >
+                            {getUserInitials(doc.owner)}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium text-foreground">
+                            {doc.name}
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground">
+                              {doc.owner}
+                            </span>
+
+                            <span className="text-[10px] text-muted-foreground/40">•</span>
+
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] font-mono px-1.5 py-0 ${doc.permission === "edit"
+                                ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                                : "bg-violet-500/10 text-violet-400 border-violet-500/20"
+                                }`}
+                            >
+                              {doc.permission === "edit" ? "Edit" : "View"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground">{doc.owner}</span>
-                        <span className="text-[10px] text-muted-foreground/40">•</span>
-                        <Badge variant="outline" className={`text-[9px] font-mono px-1.5 py-0 ${doc.permission === "edit" ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" : "bg-violet-500/10 text-violet-400 border-violet-500/20"
-                          }`}>
-                          {doc.permission === "edit" ? "Edit" : "View"}
-                        </Badge>
+                        {hours <= 24 && (
+                          <AlertCircle className="h-3.5 w-3.5 text-rose-400" />
+                        )}
+
+                        <div
+                          className={`flex items-center gap-1 rounded-lg px-2 py-1 ${hours <= 24
+                            ? "bg-rose-500/15 text-rose-400"
+                            : hours <= 24 * 7
+                              ? "bg-amber-500/15 text-amber-400"
+                              : "bg-secondary text-muted-foreground"
+                            }`}
+                        >
+                          <Calendar className="h-3 w-3" />
+
+                          <span className="text-[10px] font-mono font-medium">
+                            {formatExpires(doc.expiresIn, doc.expiresUnit)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {doc.expiresIn <= 3 && <AlertCircle className="h-3.5 w-3.5 text-rose-400" />}
-                    <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${doc.expiresIn <= 3 ? "bg-rose-500/15 text-rose-400" :
-                      doc.expiresIn <= 7 ? "bg-amber-500/15 text-amber-400" :
-                        "bg-secondary text-muted-foreground"
-                      }`}>
-                      <Calendar className="h-3 w-3" />
-                      <span className="text-[10px] font-mono font-medium">{doc.expiresIn}d</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  )
+                }))}
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Actions & Security */}
-      <div className="max-w-7xl mx-auto mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Quick Actions */}
-        <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+      {/* <div className="max-w-7xl mx-auto mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3"> */}
+      {/* Quick Actions */}
+      {/* <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
           <div className="absolute -top-16 -right-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />
           <div className="relative">
             <div className="mb-4">
@@ -933,10 +1061,10 @@ function UserDashboard() {
               </button>
             </div>
           </div>
-        </div>
+        </div> */}
 
-        {/* Security Status */}
-        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
+      {/* Security Status */}
+      {/* <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
           <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-emerald-500/5 blur-3xl" />
           <div className="relative">
             <div className="mb-4">
@@ -970,8 +1098,8 @@ function UserDashboard() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div> */}
+      {/* </div> */}
     </>
   )
 }
@@ -980,7 +1108,25 @@ export default function DashboardPage() {
   const { role, loading } = useUser()
   const isAdmin = role === "admin"
 
-  if (loading) return <div>Loading...</div>
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="relative flex flex-col items-center gap-4">
+
+          {/* Анимированный круг */}
+          <div className="h-12 w-12 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
+
+          {/* Текст */}
+          <p className="text-sm text-muted-foreground font-medium tracking-wide">
+            Загружаем данные…
+          </p>
+
+          {/* Glow эффект */}
+          <div className="absolute -z-10 h-32 w-32 rounded-full bg-violet-500/10 blur-3xl" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col">

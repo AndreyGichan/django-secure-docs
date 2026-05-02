@@ -1578,7 +1578,7 @@ export default function DocumentsPage() {
                       ) : (
                         <>
                           <DialogTitle
-                            className="text-foreground text-sm cursor-default truncate max-w-[350px]"
+                            className="text-foreground text-sm cursor-default truncate max-w-[350px] font-medium tracking-wide"
                             title={`${selectedDoc.title}.${selectedDoc.type}`}
                           >
                             {selectedDoc.title}.{selectedDoc.type}

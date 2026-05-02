@@ -1,3 +1,4 @@
+import re
 from audit.models import AuditLog
 from documents.models import Document, DocumentVersion, DownloadLink, DocumentAccess
 from django.db.models import Count, Max, Q
@@ -98,20 +99,13 @@ class ReportsService:
         return [
             {"role": row["role"], "users_count": row["users_count"]} for row in queryset
         ]
-    
 
     @staticmethod
     def user_roles_report():
-        queryset = User.objects.values("role").annotate(
-            users_count=Count("id")
-        )
+        queryset = User.objects.values("role").annotate(users_count=Count("id"))
 
         return [
-            {
-                "role": row["role"],
-                "users_count": row["users_count"]
-            }
-            for row in queryset
+            {"role": row["role"], "users_count": row["users_count"]} for row in queryset
         ]
 
     @staticmethod
@@ -145,9 +139,7 @@ class ReportsService:
                 downloads_1h=Count("id", filter=Q(timestamp__gte=last_hour)),
                 downloads_24h=Count("id", filter=Q(timestamp__gte=last_day)),
             )
-            .filter(
-                Q(downloads_1h__gte=10) | Q(downloads_24h__gte=50)
-            )
+            .filter(Q(downloads_1h__gte=10) | Q(downloads_24h__gte=50))
         )
 
         return [
@@ -155,11 +147,10 @@ class ReportsService:
                 "user_id": r["user__id"],
                 "user_email": r["user__email"],
                 "downloads_count": r["downloads_24h"],
-                "risk": "high" if r["downloads_24h"] > 50 else "medium"
+                "risk": "high" if r["downloads_24h"] > 50 else "medium",
             }
             for r in queryset
         ]
-
 
     @staticmethod
     def collaboration_index():
@@ -189,8 +180,6 @@ class ReportsService:
             for r in queryset
         ]
 
-
-
     @staticmethod
     def dashboard_stats():
         return {
@@ -200,3 +189,58 @@ class ReportsService:
             "shares": AuditLog.objects.filter(action="SHARE").count(),
             "audit_events": AuditLog.objects.count(),
         }
+    
+    @staticmethod
+    def parse_size_to_bytes(size_str):
+        if not size_str:
+            return 0
+
+        size_str = size_str.strip().upper()
+
+        match = re.match(r"([\d.]+)\s*(B|KB|MB|GB)?", size_str)
+        if not match:
+            return 0
+
+        value, unit = match.groups()
+        value = float(value)
+
+        if unit == "GB":
+            return value * 1024 * 1024 * 1024
+        if unit == "MB":
+            return value * 1024 * 1024
+        if unit == "KB":
+            return value * 1024
+        return value
+
+    @staticmethod
+    def user_dashboard_stats(user):
+
+        docs = Document.objects.filter(
+            owner=user,
+            is_active=True
+        ).prefetch_related("versions")
+
+        total_bytes = 0
+
+        for doc in docs:
+            total_bytes += ReportsService.parse_size_to_bytes(doc.size)
+
+            for v in doc.versions.all(): # type: ignore
+                pass
+
+        return {
+            "my_documents": Document.objects.filter(owner=user, is_active=True).count(),
+            "shared_with_me": DocumentAccess.objects.filter(
+                user=user,
+                document__is_active=True,
+                revoked_at__isnull=True,
+            )
+            .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()))
+            .exclude(document__owner=user)
+            .count(),
+            "downloads": AuditLog.objects.filter(user=user, action="DOWNLOAD").count(),
+            "storage_used_mb": round(total_bytes / (1024 * 1024), 2),
+        }
+    
+
+   

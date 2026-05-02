@@ -13,7 +13,7 @@ from django.http import FileResponse
 from django.core.files.base import ContentFile
 from django.db.models import Count, Q, F
 from django.http import HttpResponseRedirect, HttpResponse
-
+from math import ceil
 from .models import Document, DocumentVersion, DocumentAccess, DownloadLink
 from .serializers import (
     DocumentSerializer,
@@ -531,3 +531,42 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+    @action(detail=False, methods=["get"], url_path="expiring-access")
+    def expiring_access(self, request):
+        user = request.user
+        now = timezone.now()
+        soon = now + timedelta(days=30)
+
+        accesses = (
+            DocumentAccess.objects
+            .filter(user=user, revoked_at__isnull=True)
+            .filter(expires_at__isnull=False)
+            .filter(expires_at__lte=soon, expires_at__gte=now)
+            .select_related("document", "document__owner")
+        )
+
+        data = []
+        for access in accesses:
+            delta = access.expires_at - now  # type: ignore
+            total_seconds = delta.total_seconds()
+
+            if total_seconds >= 86400:
+                expires_in = ceil(total_seconds / 86400)
+                unit = "days"
+            else:
+                expires_in = ceil(total_seconds / 3600)
+                unit = "hours"
+
+            data.append({
+                "document_id": access.document.id,
+                "title": access.document.title,
+                "type": access.document.type,
+                "owner_name": access.document.owner.full_name,
+                "role": access.role,
+                "expires_in": expires_in,
+                "expires_unit": unit,
+            })
+
+        return Response(data)
