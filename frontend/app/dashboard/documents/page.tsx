@@ -93,6 +93,7 @@ interface DocumentVersion {
   version_number: number
   status: "approved" | "pending"
   uploaded_at: string
+  uploaded_by_email: string
 }
 
 type DownloadDocument = Document & {
@@ -1785,8 +1786,9 @@ export default function DocumentsPage() {
                           >
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-foreground">v{v.version_number}</span>
-                              <span className="text-muted-foreground tracking-wide font-mono px-1">
-                                {getVersionLabel(v, isCurrent)}
+                              <span className="text-muted-foreground tracking-wide font-mono">
+                                •{" "}{getVersionLabel(v, isCurrent)}{" "}
+                                 ({v.uploaded_by_email})
                               </span>
                             </div>
 

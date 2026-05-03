@@ -162,7 +162,7 @@ export default function RegisterPage() {
 
                         <div className="relative">
                             <div className="mb-6">
-                                <h2 className="text-base font-semibold text-foreground">Create Account</h2>
+                                <h2 className="text-base font-medium tracking-wide text-foreground">Регистрация</h2>
                                 <p className="mt-1 text-xs text-muted-foreground tracking-wide">
                                     Зарегистрируйтесь для доступа к системе
                                 </p>
@@ -262,13 +262,13 @@ export default function RegisterPage() {
                                 className="mt-6 h-10 w-full bg-gradient-to-r from-violet-600 to-cyan-500 text-white hover:from-violet-500 hover:to-cyan-400 border-0 text-sm font-semibold shadow-lg shadow-violet-500/20 transition-all duration-300 hover:shadow-violet-500/30"
                             >
                                 {loading ? (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 font-medium font-mono">
                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                        Creating account...
+                                        Создание аккаунта...
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-2">
-                                        Sign Up
+                                    <div className="flex items-center gap-2 font-medium font-mono">
+                                        Зарегистрироваться
                                         <ArrowRight className="h-4 w-4" />
                                     </div>
                                 )}

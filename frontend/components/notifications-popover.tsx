@@ -183,7 +183,7 @@ export function NotificationsPopover() {
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
                     <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-semibold text-foreground">Notifications</h4>
+                        <h4 className="text-sm font-medium tracking-wide text-foreground">Уведомления</h4>
                         {unreadCount > 0 && (
                             <Badge
                                 variant="secondary"
