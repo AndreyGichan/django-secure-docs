@@ -5,17 +5,42 @@ export const API = axios.create({
   withCredentials: true,
 });
 
+// API.interceptors.response.use(
+//   (response) => response,
+//   (error) => {
+//     if (error.response?.status === 401) {
+//       window.location.href = "/login";
+//     }
+
+//     return Promise.reject(error);
+//   }
+// );
+
 API.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      window.location.href = "/login";
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (
+       error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes("token/refresh")
+    ) {
+      originalRequest._retry = true;
+
+      try {
+        await API.post("users/token/refresh/");
+
+        return API(originalRequest);
+      } catch (refreshError) {
+        window.location.href = "/login";
+        return Promise.reject(refreshError);
+      }
     }
 
     return Promise.reject(error);
   }
 );
-
 
 // let isRefreshing = false;
 // let failedQueue: { resolve: (value?: any) => void; reject: (err: any) => void }[] = [];

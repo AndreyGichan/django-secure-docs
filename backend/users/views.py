@@ -8,6 +8,9 @@ from rest_framework.generics import ListAPIView
 from rest_framework.filters import SearchFilter
 from rest_framework.decorators import action
 from rest_framework import viewsets, filters
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import User
 from .serializers import UserProfileSerializer
@@ -77,28 +80,41 @@ class LoginView(BaseLoginView):
         access_token = response.data.get("access")
         refresh_token = response.data.get("refresh")
 
+        remember_me = request.data.get("remember_me", False)
+
+        access_max_age = 60 * 60 
+
+        refresh_max_age = (
+            60 * 60 * 24 * 7 if remember_me else None
+        )
+
         if access_token:
             response.set_cookie(
                 key="access_token",
                 value=access_token,
                 httponly=True,
                 secure=False,
-                samesite="None",
+                samesite="Lax",
                 path="/",
+                max_age=access_max_age,
             )
 
             response.data.pop("access", None)
 
         if refresh_token:
-            response.set_cookie(
-                key="refresh_token",
-                value=refresh_token,
-                httponly=True,
-                secure=False,
-                samesite="None",
-                path="/token/refresh/",
-            )
-            response.data.pop("refresh", None)
+            cookie_params = {
+                "key": "refresh_token",
+                "value": refresh_token,
+                "httponly": True,
+                "secure": False,
+                "samesite": "Lax",
+                "path": "/",
+            }
+
+            if remember_me:
+                cookie_params["max_age"] = 60 * 60 * 24 * 7  
+
+            response.set_cookie(**cookie_params)
 
         return response
 
@@ -107,7 +123,7 @@ class LogoutView(BaseLogoutView):
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         response.delete_cookie("access_token", path="/")
-        response.delete_cookie("refresh_token", path="/token/refresh/")
+        response.delete_cookie("refresh_token", path="/")
         return response
 
 
@@ -179,3 +195,60 @@ class ChangePasswordView(APIView):
                 {"detail": "Пароль успешно обновлён"}, status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CookieTokenRefreshView(TokenRefreshView):
+
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if not refresh_token:
+            return Response(
+                {"detail": "Refresh token not found"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        serializer = TokenRefreshSerializer(
+            data={"refresh": refresh_token}
+        )
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except InvalidToken:
+            return Response(
+                {"detail": "Invalid refresh token"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        access_token = serializer.validated_data["access"] # type: ignore
+
+        new_refresh_token = serializer.validated_data.get("refresh") # type: ignore
+
+        response = Response(
+            {"detail": "Token refreshed"},
+            status=status.HTTP_200_OK
+        )
+
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,
+            samesite="Lax",
+            path="/",
+            max_age=60 * 60,
+        )
+
+        if new_refresh_token:
+            cookie_params = {
+                "key": "refresh_token",
+                "value": new_refresh_token,
+                "httponly": True,
+                "secure": False,
+                "samesite": "Lax",
+                "path": "/",
+            }
+
+            response.set_cookie(**cookie_params)
+
+        return response

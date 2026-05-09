@@ -46,7 +46,7 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(seconds=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKEN": True,
     "BLACKLIST_AFTER_ROTATION": False,
@@ -57,7 +57,7 @@ SIMPLE_JWT = {
     "AUTH_COOKIE_SECURE": False,          
     "AUTH_COOKIE_HTTP_ONLY": True,
     "AUTH_COOKIE_PATH": "/",              
-    "AUTH_COOKIE_SAMESITE": "None",        
+    "AUTH_COOKIE_SAMESITE": "Lax",     
 }
 
 REST_FRAMEWORK = {
@@ -74,6 +74,7 @@ REST_AUTH = {
     'USE_JWT': True,
     'JWT_AUTH_HTTPONLY': True,
     'JWT_AUTH_COOKIE': 'access_token', 
+    'JWT_AUTH_REFRESH_COOKIE': 'refresh_token',
 }
 
 REST_USE_JWT = True

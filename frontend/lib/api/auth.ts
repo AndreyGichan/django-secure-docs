@@ -15,7 +15,7 @@ interface SearchUsersParams {
   role?: string;
 }
 
-export const login = (data: { email: string; password: string }) =>
+export const login = (data: { email: string; password: string; remember_me?: boolean; }) =>
   API.post("users/login/", data);
 export const register = (data: RegisterData) => API.post("users/register/", data);
 export const logout = () => API.post("users/logout/");

@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [rememberMe, setRememberMe] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,7 +27,7 @@ export default function LoginPage() {
     console.log("Trying login with:", { email, password });
 
     try {
-      const res = await login({ email, password });
+      const res = await login({ email, password, remember_me: rememberMe, });
       console.log("Успешно вошли:", res.data);
       router.push("/dashboard");
     } catch (err: any) {
@@ -121,7 +122,12 @@ export default function LoginPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Checkbox id="remember" className="border-border data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500" />
+                  <Checkbox
+                    id="remember"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(!!checked)}
+                    className="border-border data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500"
+                  />
                   <label htmlFor="remember" className="text-xs text-muted-foreground tracking-wide cursor-pointer">
                     Запомнить меня
                   </label>
