@@ -286,6 +286,11 @@ export default function DocumentsPage() {
   const [titleEdit, setTitleEdit] = useState("");
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null)
   const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null)
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
+  const [errorDialogData, setErrorDialogData] = useState<{
+    title: string
+    message: string
+  }>({ title: "Ошибка", message: "" })
 
 
   const hiddenFileInput = useRef<HTMLInputElement>(null)
@@ -370,6 +375,7 @@ export default function DocumentsPage() {
       setTotalCount(response.data.count);
     } catch (error) {
       console.error("Failed to fetch documents", error);
+      showError("Не удалось загрузить документы. Попробуйте обновить страницу")
     } finally {
       setLoading(false);
     }
@@ -436,7 +442,7 @@ export default function DocumentsPage() {
 
   const handleUpload = async () => {
     if (!uploadFile || !uploadTitle) {
-      alert("Заполните все поля")
+      showError("Пожалуйста, заполните все обязательные поля")
       return
     }
 
@@ -718,7 +724,7 @@ export default function DocumentsPage() {
       await fetchDocuments();
     } catch (err) {
       console.error(err);
-      alert("Не удалось зашифровать и загрузить файл");
+      showError("Не удалось зашифровать и загрузить файл. Проверьте приватный ключ и попробуйте снова")
     } finally {
       setUploadLoadingVersion(false);
     }
@@ -768,6 +774,11 @@ export default function DocumentsPage() {
     pages.push(totalPages)
 
     return pages
+  }
+
+  const showError = (message: string, title = "Ошибка") => {
+    setErrorDialogData({ title, message })
+    setErrorDialogOpen(true)
   }
 
   return (
@@ -1258,7 +1269,7 @@ export default function DocumentsPage() {
               <div className="flex items-center gap-3">
                 <Trash2 className="h-10 w-10 text-destructive/70" />
                 <span className="text-xs text-muted-foreground tracking-wide font-mono">
-                  После удаления документ будет полностью удалён из системы и восстановить его будет невозможно.
+                  После удаления документ будет полностью удален из системы и восстановить его будет невозможно.
                 </span>
               </div>
             </div>
@@ -1788,7 +1799,7 @@ export default function DocumentsPage() {
                               <span className="font-mono text-foreground">v{v.version_number}</span>
                               <span className="text-muted-foreground tracking-wide font-mono">
                                 •{" "}{getVersionLabel(v, isCurrent)}{" "}
-                                 ({v.uploaded_by_email})
+                                ({v.uploaded_by_email})
                               </span>
                             </div>
 
@@ -1887,6 +1898,32 @@ export default function DocumentsPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Dialog */}
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent className="bg-card text-card-foreground border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground tracking-wide font-medium flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/15">
+                <X className="h-4 w-4 text-destructive" />
+              </div>
+              {errorDialogData.title}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground tracking-wide pt-2">
+              {errorDialogData.message}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex justify-end pt-4">
+            <Button
+              onClick={() => setErrorDialogOpen(false)}
+              className="bg-secondary text-foreground hover:bg-secondary/80 border border-border tracking-wide font-mono"
+            >
+              OK
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -21,6 +21,7 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DialogFooter,
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { createDownloadLink, downloadEncrypted, downloadDecrypted } from "@/lib/api/documents"
@@ -47,6 +48,11 @@ export function DownloadDocumentDialog({
     const [downloadMode, setDownloadMode] = useState<"decrypted" | "encrypted" | null>(null)
     const [downloadComplete, setDownloadComplete] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const [errorDialogOpen, setErrorDialogOpen] = useState(false)
+    const [errorDialogData, setErrorDialogData] = useState<{
+        title: string
+        message: string
+    }>({ title: "Ошибка", message: "" })
 
     const handleKeyAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -76,6 +82,8 @@ export function DownloadDocumentDialog({
     const handleDownload = async (mode: "decrypted" | "encrypted") => {
         setDownloadMode(mode)
         setDownloading(true)
+
+        let hasError = false
         try {
             const token = await createDownloadLink(documentId, versionId);
             if (mode === "encrypted") {
@@ -88,9 +96,17 @@ export function DownloadDocumentDialog({
             setDownloadComplete(true)
         } catch (err) {
             console.error(err)
-            alert(mode === "encrypted" ? "Не удалось скачать зашифрованный файл" : "Не удалось расшифровать файл")
+            hasError = true
+            showError(
+                mode === "encrypted"
+                    ? "Не удалось скачать зашифрованный файл. Попробуйте ещё раз"
+                    : "Не удалось расшифровать файл. Проверьте приватный ключ и попробуйте снова"
+            )
         } finally {
             setDownloading(false)
+            if (hasError) {
+                return;
+            }
             setTimeout(() => {
                 setDownloadComplete(false)
                 setDownloadMode(null)
@@ -98,6 +114,11 @@ export function DownloadDocumentDialog({
                 setPrivateKeyFile(null)
             }, 1500)
         }
+    }
+
+    const showError = (message: string, title = "Ошибка") => {
+        setErrorDialogData({ title, message })
+        setErrorDialogOpen(true)
     }
 
     return (
@@ -293,6 +314,32 @@ export function DownloadDocumentDialog({
                     </div>
                 </div>
             </DialogContent>
+
+            {/* Error Dialog */}
+            <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+                <DialogContent className="bg-card text-card-foreground border-border max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-foreground tracking-wide font-medium flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/15">
+                                <X className="h-4 w-4 text-destructive" />
+                            </div>
+                            {errorDialogData.title}
+                        </DialogTitle>
+                        <DialogDescription className="text-muted-foreground tracking-wide pt-2">
+                            {errorDialogData.message}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <DialogFooter className="flex justify-end pt-4">
+                        <Button
+                            onClick={() => setErrorDialogOpen(false)}
+                            className="bg-secondary text-foreground hover:bg-secondary/80 border border-border tracking-wide font-mono"
+                        >
+                            OK
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Dialog>
     )
 }
