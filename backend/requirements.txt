@@ -16,6 +16,7 @@ django-cors-headers==4.9.0
 django-filter==25.2
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
+gunicorn==21.2.0 
 fsspec==2026.3.0
 h11==0.16.0
 h2==4.3.0
@@ -59,5 +60,6 @@ typing_extensions==4.15.0
 tzdata==2025.3
 urllib3==2.6.3
 websockets==15.0.1
+whitenoise[brotli]==6.6.0
 yarl==1.23.0
 zstandard==0.25.0
