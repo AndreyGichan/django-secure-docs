@@ -12,8 +12,6 @@ import {
   Activity,
   ArrowUpRight,
   TrendingUp,
-  Clock,
-  Eye,
   FileUp,
   FolderOpen,
   Key,
@@ -44,13 +42,6 @@ import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { useUser } from "@/lib/user-context"
 import {
   getTopUsers,
@@ -400,12 +391,6 @@ function AdminDashboard() {
           time: new Date(log.timestamp).toLocaleTimeString(),
         }))
       )
-
-      // setStats({
-      //   documents: documents.data?.length ?? 0,
-      //   users: roles.data?.reduce((a: number, b: any) => a + b.count, 0),
-      //   downloads: downloads.data?.reduce((a: number, b: any) => a + b.downloads_count, 0)
-      // })
 
       setStats(dashboard.data)
 
@@ -1023,83 +1008,6 @@ function UserDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Quick Actions & Security */}
-      {/* <div className="max-w-7xl mx-auto mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3"> */}
-      {/* Quick Actions */}
-      {/* <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
-          <div className="absolute -top-16 -right-16 h-32 w-32 rounded-full bg-violet-500/5 blur-3xl" />
-          <div className="relative">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-foreground">Quick Actions</h3>
-              <p className="text-xs text-muted-foreground">Frequently used features</p>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-violet-500/30 hover:bg-violet-500/10 transition-all group">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 group-hover:scale-110 transition-transform">
-                  <FileUp className="h-5 w-5" />
-                </div>
-                <span className="text-xs font-medium text-foreground">Upload</span>
-              </button>
-              <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-cyan-500/30 hover:bg-cyan-500/10 transition-all group">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400 group-hover:scale-110 transition-transform">
-                  <Share2 className="h-5 w-5" />
-                </div>
-                <span className="text-xs font-medium text-foreground">Share</span>
-              </button>
-              <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-emerald-500/30 hover:bg-emerald-500/10 transition-all group">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 group-hover:scale-110 transition-transform">
-                  <Key className="h-5 w-5" />
-                </div>
-                <span className="text-xs font-medium text-foreground">Decrypt</span>
-              </button>
-              <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-amber-500/30 hover:bg-amber-500/10 transition-all group">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 group-hover:scale-110 transition-transform">
-                  <FolderOpen className="h-5 w-5" />
-                </div>
-                <span className="text-xs font-medium text-foreground">Browse</span>
-              </button>
-            </div>
-          </div>
-        </div> */}
-
-      {/* Security Status */}
-      {/* <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5">
-          <div className="absolute -bottom-16 -right-16 h-32 w-32 rounded-full bg-emerald-500/5 blur-3xl" />
-          <div className="relative">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-foreground">Security Status</h3>
-              <p className="text-xs text-muted-foreground">Your encryption keys</p>
-            </div>
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
-                  <Lock className="h-4 w-4 text-emerald-400" />
-                </div>
-                <div className="flex flex-col flex-1">
-                  <span className="text-xs font-medium text-foreground">Private Key</span>
-                  <span className="text-[10px] text-emerald-400">Active</span>
-                </div>
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              </div>
-              <div className="flex flex-col gap-2 p-3 rounded-xl bg-secondary/30">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">Key created</span>
-                  <span className="text-[10px] font-mono text-foreground">Jan 15, 2026</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">Algorithm</span>
-                  <span className="text-[10px] font-mono text-foreground">RSA-4096</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">Fingerprint</span>
-                  <span className="text-[10px] font-mono text-muted-foreground">A7:3F:...92:1B</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div> */}
-      {/* </div> */}
     </>
   )
 }

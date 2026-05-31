@@ -1,7 +1,7 @@
 from dj_rest_auth.views import LoginView as BaseLoginView
 from dj_rest_auth.views import LogoutView as BaseLogoutView
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import ListAPIView
@@ -252,3 +252,38 @@ class CookieTokenRefreshView(TokenRefreshView):
             response.set_cookie(**cookie_params)
 
         return response
+    
+
+from .serializers import ForgotPasswordSerializer
+from notifications.services import create_notification  
+
+class ForgotPasswordView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            email = serializer.validated_data['email'] # type: ignore
+            user = User.objects.filter(email__iexact=email).first()
+            
+            if user:
+                admins = User.objects.filter(
+                    role='admin',
+                    is_active=True
+                )
+                
+                for admin in admins:
+                    create_notification(
+                        user=admin,
+                        type="password_reset_request", 
+                        title="Запрос сброса пароля",
+                        message=f'Пользователь "{user.full_name}" ({user.email}) запросил сброс пароля',
+                    )
+                
+            return Response(
+                {"detail": "Если пользователь с таким email существует, администраторы получили уведомление"},
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

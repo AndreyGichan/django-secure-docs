@@ -2,13 +2,20 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, Eye, EyeOff, ArrowRight } from "lucide-react"
-
+import { FileText, Eye, EyeOff, ArrowRight, KeyRound, CheckCircle2 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { login } from "@/lib/api/auth";
+import { login, forgotPassword } from "@/lib/api/auth";
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,6 +25,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [rememberMe, setRememberMe] = useState(false)
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false)
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +46,22 @@ export default function LoginPage() {
       setError(err.response?.data?.detail || "Ошибка входа");
     } finally {
       setLoading(false);
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    if (!forgotPasswordEmail) return
+
+    setForgotPasswordLoading(true)
+    setForgotPasswordSuccess(false)
+
+    try {
+      await forgotPassword(forgotPasswordEmail)
+      setForgotPasswordSuccess(true)
+    } catch (err: any) {
+      console.error("Ошибка запроса сброса пароля", err)
+    } finally {
+      setForgotPasswordLoading(false)
     }
   }
 
@@ -99,9 +127,20 @@ export default function LoginPage() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs text-muted-foreground font-medium">Пароль</Label>
-                    <button type="button" className="text-[11px] tracking-wide text-violet-400 hover:text-violet-300 transition-colors">
+                    {/* <button type="button" className="text-[11px] tracking-wide text-violet-400 hover:text-violet-300 transition-colors">
+                      Забыли пароль?
+                    </button> */}
+                    <button
+                      type="button"
+                      className="text-[11px] tracking-wide text-violet-400 hover:text-violet-300 transition-colors"
+                      onClick={() => {
+                        setForgotPasswordEmail(email)
+                        setForgotPasswordOpen(true)
+                      }}
+                    >
                       Забыли пароль?
                     </button>
+
                   </div>
                   <div className="relative">
                     <Input
@@ -176,6 +215,97 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={forgotPasswordOpen} onOpenChange={(open) => {
+        setForgotPasswordOpen(open)
+        if (!open) {
+          // Сброс состояния при закрытии
+          setForgotPasswordSuccess(false)
+          setForgotPasswordLoading(false)
+        }
+      }}>
+        <DialogContent className="bg-card text-card-foreground border-border max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 border border-amber-500/20">
+                <KeyRound className="h-6 w-6 text-amber-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-foreground font-medium">Сброс пароля</DialogTitle>
+                <DialogDescription className="mt-1 text-muted-foreground text-xs tracking-wide">
+                  Администратор получит уведомление о вашем запросе
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {!forgotPasswordSuccess ? (
+            <>
+              <div className="py-4">
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <Input
+                    type="email"
+                    value={forgotPasswordEmail}
+                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    placeholder="user@company.com"
+                    className="bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
+                    disabled={forgotPasswordLoading}
+                  />
+                </div>
+
+                <p className="text-[11px] tracking-wide text-muted-foreground mt-3">
+                  После отправки запроса администратор сбросит ваш пароль и свяжется с вами.
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="ghost"
+                  onClick={() => setForgotPasswordOpen(false)}
+                  className="text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  disabled={forgotPasswordLoading}
+                >
+                  Отмена
+                </Button>
+                <Button
+                  className="bg-gradient-to-r from-[hsl(var(--gradient-from))] to-[hsl(var(--gradient-to))] text-primary-foreground hover:opacity-90 border-0"
+                  disabled={!forgotPasswordEmail || forgotPasswordLoading}
+                  onClick={handleForgotPassword}
+                >
+                  {forgotPasswordLoading ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white mr-2" />
+                      Отправка...
+                    </>
+                  ) : (
+                    "Отправить запрос"
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <div className="py-6 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                </div>
+              </div>
+              <h4 className="text-foreground font-medium mb-2">Запрос отправлен</h4>
+              <p className="text-sm text-muted-foreground tracking-wide">
+                Администратор получил уведомление и свяжется с вами в ближайшее время.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-6 bg-secondary/50 border-border"
+                onClick={() => setForgotPasswordOpen(false)}
+              >
+                Закрыть
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -12,7 +12,7 @@ import {
     Clock,
     Check,
     CheckCheck,
-    X,
+    KeyRound,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,6 +31,7 @@ type NotificationType =
     | "access_granted"
     | "access_revoked"
     | "access_expired"
+    | "password_reset_request";
 
 
 interface Notification {
@@ -77,6 +78,11 @@ const notificationConfig: Record<
         icon: Clock,
         color: "text-orange-400",
         bgColor: "bg-orange-500/10",
+    },
+    password_reset_request: {
+        icon: KeyRound,
+        color: "text-amber-400",
+        bgColor: "bg-amber-500/10",
     },
 }
 
@@ -133,13 +139,31 @@ export function NotificationsPopover() {
     }
 
     const handleNotificationClick = async (notification: Notification) => {
+        await markNotificationRead(notification.id)
+
         const res = await markNotificationRead(notification.id)
         setNotifications(prev =>
             prev.map(n => n.id === notification.id ? { ...n, read: res.data.is_read } : n)
         )
         setOpen(false)
 
-        router.push("/dashboard/documents")
+        switch (notification.type) {
+            case "password_reset_request":
+                router.push("/dashboard/users")
+                break
+
+            case "access_granted":
+            case "access_revoked":
+            case "access_expired":
+            case "version_added":
+            case "document_created":
+            case "document_deleted":
+                router.push("/dashboard/documents")
+                break
+
+            default:
+                router.push("/dashboard")
+        }
     }
 
     const markAllAsRead = async () => {
@@ -151,10 +175,6 @@ export function NotificationsPopover() {
         )
     }
 
-
-    const clearAll = () => {
-        setNotifications([])
-    }
 
     return (
         <Popover open={open} onOpenChange={setOpen}>

@@ -37,3 +37,5 @@ export const adminResetPassword = (id: string, newPassword: string) =>
   API.post(`users/users/${id}/reset_password/`, {
     new_password: newPassword,
   });
+export const forgotPassword = (email: string) =>
+  API.post("users/forgot-password/", { email });

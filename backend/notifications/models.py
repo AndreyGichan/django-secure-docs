@@ -12,6 +12,7 @@ class Notification(models.Model):
         ("access_granted", "Access granted"),
         ("access_revoked", "Access revoked"),
         ("access_expired", "Access expired"),
+        ("password_reset_request", "Password reset request"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
