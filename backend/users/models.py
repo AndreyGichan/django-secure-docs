@@ -38,6 +38,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 
+    failed_login_attempts = models.PositiveIntegerField(default=0, verbose_name="Неудачные попытки входа")
+    locked_until = models.DateTimeField(null=True, blank=True, verbose_name="Заблокирован до")
+
     objects = UserManager()
 
     USERNAME_FIELD = 'email'

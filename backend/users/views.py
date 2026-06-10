@@ -21,6 +21,9 @@ from rest_framework.generics import UpdateAPIView
 from .serializers import ChangePasswordSerializer, AdminResetPasswordSerializer
 from .utils.pagination import UsersLimitOffsetPagination
 from .permissions import IsAdminRole
+from datetime import timedelta
+from django.db.models import F
+from rest_framework.exceptions import ValidationError
 
 
 class UsersViewSet(viewsets.ModelViewSet):
@@ -74,8 +77,69 @@ class UsersViewSet(viewsets.ModelViewSet):
 
 
 class LoginView(BaseLoginView):
-    def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)  # type: ignore
+    def post(self, request, *args, **kwargs): # type: ignore
+        email = request.data.get('email')
+        user = None
+        
+        if email:
+            try:
+                user = User.objects.get(email__iexact=email)
+            except User.DoesNotExist:
+                pass
+            
+            if user:
+                if user.locked_until and user.locked_until > timezone.now():
+                    return Response(
+                        {"detail": "Учетная запись временно заблокирована из-за превышения количества попыток входа. Пожалуйста, попробуйте позже."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                
+                if user.locked_until and user.locked_until <= timezone.now():
+                    user.failed_login_attempts = 0
+                    user.locked_until = None
+                    user.save(update_fields=['failed_login_attempts', 'locked_until'])
+
+        try:
+            response = super().post(request, *args, **kwargs)
+        except ValidationError as e:
+            if user:
+                User.objects.filter(pk=user.pk).update(
+                    failed_login_attempts=F('failed_login_attempts') + 1
+                )
+                user.refresh_from_db()
+                
+                if user.failed_login_attempts >= 5 and not user.locked_until:
+                    user.locked_until = timezone.now() + timedelta(minutes=30)
+                    user.save(update_fields=['locked_until'])
+            
+            return Response(
+                {"detail": "Неверный email или пароль"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            if user:
+                User.objects.filter(pk=user.pk).update(
+                    failed_login_attempts=F('failed_login_attempts') + 1
+                )
+                user.refresh_from_db()
+                
+                if user.failed_login_attempts >= 5 and not user.locked_until:
+                    user.locked_until = timezone.now() + timedelta(minutes=30)
+                    user.save(update_fields=['locked_until'])
+            
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if user:
+            if user.failed_login_attempts > 0 or user.locked_until:
+                user.failed_login_attempts = 0
+                user.locked_until = None
+                user.save(update_fields=['failed_login_attempts', 'locked_until'])
+        
+
+        # response = super().create(request, *args, **kwargs)  # type: ignore
 
         access_token = response.data.get("access")
         refresh_token = response.data.get("refresh")

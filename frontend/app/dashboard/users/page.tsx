@@ -75,6 +75,9 @@ interface User {
     date_joined: string
     last_login: string | null
     documentsCount: number
+    is_locked: boolean
+    failed_login_attempts: number
+    locked_until: string | null
 }
 
 
@@ -356,18 +359,41 @@ export default function UsersPage() {
                                 >
                                     <TableCell>
                                         <div className="flex items-center gap-3">
-                                            <Avatar className="h-9 w-9">
-                                                <AvatarFallback className={`bg-gradient-to-br ${getAvatarColor(user.full_name)} text-[10px] font-bold text-white`}>
-                                                    {getInitials(user.full_name)}
-                                                </AvatarFallback>
-                                            </Avatar>
+                                            <div className="relative">
+                                                <Avatar className="h-9 w-9">
+                                                    <AvatarFallback className={`bg-gradient-to-br ${getAvatarColor(user.full_name)} text-[10px] font-bold text-white`}>
+                                                        {getInitials(user.full_name)}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                {user.is_locked && (
+                                                    <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 border-2 border-card">
+                                                        <Ban className="h-2.5 w-2.5 text-white" />
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="flex flex-col">
-                                                <span className="text-xs font-medium text-foreground">
-                                                    {user.full_name}
-                                                </span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs font-medium text-foreground">
+                                                        {user.full_name}
+                                                    </span>
+                                                    {user.is_locked && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="bg-rose-500/15 text-rose-400 border-rose-500/30 text-[9px] tracking-wide font-mono"
+                                                        >
+                                                            <Ban className="mr-0.5 h-2.5 w-2.5" />
+                                                            Заблокирован
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 <span className="text-[10px] text-muted-foreground">
                                                     {user.email}
                                                 </span>
+                                                {user.failed_login_attempts > 0 && !user.is_locked && (
+                                                    <span className="text-[9px] text-amber-400/80 font-mono tracking-wide">
+                                                        ⚠ {user.failed_login_attempts}/5 попыток
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </TableCell>
@@ -546,6 +572,41 @@ export default function UsersPage() {
                             </DialogHeader>
                             <Separator className="bg-border/50" />
                             <div className="flex flex-col gap-3 py-2">
+                                {/* Статус блокировки */}
+                                {selectedUser.is_locked && (
+                                    <div className="flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/20 shrink-0">
+                                            <Ban className="h-4 w-4 text-rose-400" />
+                                        </div>
+                                        <div className="flex flex-col gap-1 flex-1">
+                                            <span className="text-xs font-medium text-rose-400">Учетная запись заблокирована</span>
+                                            <span className="text-[11px] text-rose-400/80 tracking-wide">
+                                                {selectedUser.locked_until
+                                                    ? `Разблокируется: ${formatDateTime(selectedUser.locked_until)}`
+                                                    : "Временно недоступна для входа"}
+                                            </span>
+                                            <span className="text-[10px] text-rose-400/60 font-mono">
+                                                Неудачных попыток: {selectedUser.failed_login_attempts}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Предупреждение о приближении к лимиту */}
+                                {!selectedUser.is_locked && selectedUser.failed_login_attempts > 0 && (
+                                    <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20 shrink-0">
+                                            <AlertTriangle className="h-4 w-4 text-amber-400" />
+                                        </div>
+                                        <div className="flex flex-col gap-1 flex-1">
+                                            <span className="text-xs font-medium text-amber-400">Внимание: неудачные попытки входа</span>
+                                            <span className="text-[11px] text-amber-400/80 tracking-wide">
+                                                {selectedUser.failed_login_attempts} из 5 попыток. При превышении аккаунт будет заблокирован на 30 минут.
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">Role</span>
                                     {getRoleBadge(selectedUser.role)}

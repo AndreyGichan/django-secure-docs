@@ -3,16 +3,23 @@ from .models import User
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from django.contrib.auth import password_validation
 from documents.models import Document
+from django.utils import timezone
 
 class UserProfileSerializer(serializers.ModelSerializer):
     documentsCount = serializers.SerializerMethodField()
+    is_locked = serializers.SerializerMethodField()  
+    failed_login_attempts = serializers.IntegerField(read_only=True)  
+    locked_until = serializers.DateTimeField(read_only=True)
     
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "public_key", "role", "date_joined", "last_login", "documentsCount"]
+        fields = ["id", "email", "full_name", "public_key", "role", "date_joined", "last_login", "documentsCount", "is_locked", "failed_login_attempts", "locked_until",]
 
     def get_documentsCount(self, obj):
         return Document.objects.filter(owner=obj).count()
+    
+    def get_is_locked(self, obj):
+        return bool(obj.locked_until and obj.locked_until > timezone.now())
 
 
 class CustomRegisterSerializer(RegisterSerializer):
