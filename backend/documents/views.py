@@ -31,6 +31,7 @@ from .utils.filter import DocumentFilter
 from .utils.pagination import DocumentLimitOffsetPagination
 from .utils.file_format import build_encrypted_file_with_header
 from config.supabase_utils import upload_to_supabase
+from reports.services import ReportsService
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -356,8 +357,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if document.status == "draft" and document.owner != user:
             return Response({"detail": "Only owner can download draft document"}, status=status.HTTP_403_FORBIDDEN)
 
-        file = link.document_version.file
-
         log_action(
             user=request.user,
             action=AuditAction.DOWNLOAD,
@@ -366,6 +365,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
             old_data=None,
             new_data={"link_token": str(token), "name": f"{document.title}.{document.type}"},
             ip_address=get_client_ip(request),
+        )
+
+        ReportsService.check_document_downloads(
+            document=document,
+            downloader=request.user,
         )
 
         # return FileResponse(file.open("rb"), as_attachment=True)

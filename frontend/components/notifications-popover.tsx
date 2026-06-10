@@ -13,6 +13,7 @@ import {
     Check,
     CheckCheck,
     KeyRound,
+    ShieldAlert
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,7 +32,8 @@ type NotificationType =
     | "access_granted"
     | "access_revoked"
     | "access_expired"
-    | "password_reset_request";
+    | "password_reset_request"
+    | "suspicious_activity"
 
 
 interface Notification {
@@ -83,6 +85,11 @@ const notificationConfig: Record<
         icon: KeyRound,
         color: "text-amber-400",
         bgColor: "bg-amber-500/10",
+    },
+    suspicious_activity: {
+        icon: ShieldAlert,
+        color: "text-red-400",
+        bgColor: "bg-red-500/10",
     },
 }
 

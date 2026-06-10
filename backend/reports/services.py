@@ -6,7 +6,8 @@ from django.db.models.functions import TruncDate
 from datetime import timedelta
 from django.utils import timezone
 from users.models import User
-
+from notifications.services import create_notification
+from notifications.models import Notification
 
 class ReportsService:
 
@@ -242,5 +243,42 @@ class ReportsService:
             "storage_used_mb": round(total_bytes / (1024 * 1024), 2),
         }
     
+    @staticmethod
+    def check_document_downloads(document, downloader):
+
+        now = timezone.now()
+        last_hour = now - timedelta(hours=1)
+
+        downloads_count = AuditLog.objects.filter(
+            action="DOWNLOAD",
+            target_type="DocumentVersion",
+            target_id__in=document.versions.values_list("id", flat=True),
+            timestamp__gte=last_hour,
+        ).count()
+
+        if downloads_count < 10:
+            return
+
+        already_sent = Notification.objects.filter(
+            user=document.owner,
+            type="suspicious_activity",
+            document_id=document.id,
+            created_at__gte=last_hour,
+        ).exists()
+
+        if already_sent:
+            return
+
+        create_notification(
+            user=document.owner,
+            type="suspicious_activity",
+            title="Подозрительная активность",
+            message=(
+                f'Документ "{document.title}" был скачан '
+                f'{downloads_count} раз за последний час.'
+            ),
+            document=document,
+        )
+        
 
    
